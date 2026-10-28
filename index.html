@@ -1,0 +1,1273 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>我的课表</title>
+<style>
+  :root {
+    --ink: #1b1b1d;
+    --sub: #71717a;
+    --line: #e5e5ea;
+    --bg: #f7f6f3;
+    --card: #ffffff;
+    --deep: #2f6b4f;
+    --mid: #a9cdba;
+    --light: #e7f0ea;
+    --weekend: #fbfaf6;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+    line-height: 1.5;
+  }
+  .app { max-width: 1180px; margin: 0 auto; padding: 32px 24px 56px; }
+  header h1 { margin: 0 0 6px; font-size: 24px; font-weight: 600; letter-spacing: .4px; }
+  .headline { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
+  .headline h1 { margin: 0; }
+  .tools { display: flex; gap: 6px; }
+  .tools button {
+    padding: 6px 12px;
+    font-size: 12.5px;
+    font-family: inherit;
+    color: var(--ink);
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  .tools button:hover { border-color: var(--mid); background: #fbfcfa; }
+  header p { margin: 0 0 24px; font-size: 13px; color: var(--sub); }
+  .layout { display: grid; grid-template-columns: minmax(0, 1fr) 268px; gap: 20px; align-items: start; }
+  .board-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .board {
+    display: grid;
+    grid-template-columns: 48px repeat(6, minmax(104px, 1fr));
+    gap: 8px;
+    min-width: 740px;
+  }
+  .corner, .dayhead {
+    font-size: 12px;
+    color: var(--sub);
+    text-align: center;
+    padding: 6px 0 2px;
+    letter-spacing: .5px;
+  }
+  .dayhead.weekend { color: #a1917a; }
+  .slotlabel {
+    font-size: 12px;
+    color: var(--sub);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding-right: 2px;
+  }
+  .cell {
+    min-height: 66px;
+    border-radius: 10px;
+    border: 1px dashed #dcdcd6;
+    background: #fdfdfc;
+    padding: 9px 10px;
+    font-size: 13px;
+    text-align: left;
+    cursor: pointer;
+    transition: background .12s, border-color .12s;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 2px;
+  }
+  .cell:hover { border-color: #b9b9b0; background: #fffef9; }
+  .cell.empty::after {
+    content: "+";
+    color: #c9c9c2;
+    font-size: 15px;
+    margin: 0 auto;
+  }
+  .cell.filled { border-style: solid; border-color: transparent; }
+  .cell.am { background: var(--deep); color: #f4faf6; }
+  .cell.am .place { color: #cfe3d7; }
+  .cell.pm { background: var(--mid); color: #17352a; }
+  .cell.pm .place { color: #2f5c4a; }
+  .cell.eve { background: var(--light); color: #24473a; }
+  .cell.eve .place { color: #4d7161; }
+  .course { font-weight: 600; font-size: 13.5px; line-height: 1.35; }
+  .place { font-size: 11.5px; }
+  .place.missing { opacity: .5; }
+  .adjust { font-size: 10.5px; opacity: .9; }
+  .ghost { font-size: 11px; color: #9a8a6a; }
+  .cell.vacated::after { content: none; }
+  /* 和上一节换了教室 */
+  .cell.moved.am { box-shadow: inset 4px 0 0 #eaf5ee; }
+  .cell.moved.pm, .cell.moved.eve { box-shadow: inset 4px 0 0 #1b1b1d; }
+  .cell.moved .place { font-weight: 700; }
+  .cell.moved .place::before { content: "↦ "; }
+  .cell[draggable="true"] { cursor: grab; }
+  .cell.dragging { opacity: .4; }
+  .cell.drop-hover { outline: 2px dashed #2f6b4f; outline-offset: 2px; }
+  /* 本周调课提示 */
+  .week-note {
+    margin: 0 0 14px;
+    padding: 10px 14px;
+    font-size: 12.5px;
+    line-height: 1.6;
+    color: #6b4f1d;
+    background: #fdf6e6;
+    border: 1px solid #f0e0bd;
+    border-radius: 10px;
+  }
+  .week-note strong { font-weight: 600; }
+  /* 周导航 */
+  .weeknav {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 18px;
+    font-size: 13px;
+    color: var(--sub);
+  }
+  .weeknav #week-label { font-weight: 600; color: var(--ink); min-width: 62px; }
+  .weeknav button {
+    width: 26px;
+    height: 26px;
+    line-height: 1;
+    font-size: 15px;
+    font-family: inherit;
+    color: var(--ink);
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    cursor: pointer;
+  }
+  .weeknav button:hover { border-color: var(--mid); }
+  .weeknav button:disabled { opacity: .35; cursor: default; }
+  .weeknav .ghostbtn { width: auto; padding: 0 9px; font-size: 12px; color: var(--sub); }
+  #week-meta { margin-left: auto; font-size: 12px; }
+  .board.viewonly .cell { cursor: default; }
+
+  .today {
+    margin: 0 0 18px;
+    padding: 14px 16px;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+  }
+  .today-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 10px;
+    gap: 12px;
+  }
+  .today-head h2 { margin: 0; font-size: 14px; font-weight: 600; }
+  .today-head span { font-size: 12.5px; color: var(--sub); }
+  .today-list { display: flex; flex-wrap: wrap; gap: 8px; }
+  .today-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 7px 9px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    font-size: 13px;
+  }
+  .today-item .t { font-weight: 600; }
+  .today-item .s { color: var(--sub); font-size: 12px; }
+  .today-item button {
+    border: 0;
+    background: var(--light);
+    color: #24473a;
+    font-size: 12px;
+    font-family: inherit;
+    padding: 5px 9px;
+    border-radius: 7px;
+    cursor: pointer;
+  }
+  .today-item button:hover { background: var(--mid); }
+  .today-empty { font-size: 13px; color: var(--sub); margin: 0; }
+  .tag {
+    font-size: 11px;
+    font-style: normal;
+    color: #2f5c4a;
+    background: var(--light);
+    border-radius: 5px;
+    padding: 1px 5px;
+    margin-right: 6px;
+    white-space: nowrap;
+  }
+  .side {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 18px 16px;
+    position: sticky;
+    top: 24px;
+  }
+  .side h2 { margin: 0 0 12px; font-size: 15px; font-weight: 600; }
+  #todo-form { display: flex; gap: 6px; margin-bottom: 12px; }
+  #todo-input {
+    flex: 1; min-width: 0;
+    padding: 8px 10px;
+    font-size: 13px;
+    font-family: inherit;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    outline: none;
+  }
+  #todo-input:focus { border-color: var(--mid); }
+  #todo-form button {
+    padding: 8px 12px;
+    font-size: 13px;
+    font-family: inherit;
+    color: #fff;
+    background: var(--deep);
+    border: 0;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  #todo-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  #todo-table thead th {
+    text-align: left;
+    font-weight: 500;
+    font-size: 11px;
+    letter-spacing: .4px;
+    color: var(--sub);
+    padding: 0 6px 6px;
+    border-bottom: 1px solid var(--line);
+  }
+  #todo-table th.col-done, #todo-table td.col-done { width: 30px; text-align: center; padding-left: 0; padding-right: 0; }
+  #todo-table th.col-del, #todo-table td.col-del { width: 22px; }
+  #todo-table th.col-course, #todo-table td.col-course { width: 118px; }
+  #todo-table tbody tr { border-bottom: 1px solid #f1f1ee; }
+  #todo-table tbody tr:hover { background: #fafaf7; }
+  #todo-table tbody td { padding: 8px 6px; vertical-align: top; }
+  #todo-table td.col-text { word-break: break-word; }
+  #todo-table td.col-course { font-size: 11.5px; color: #4d7161; line-height: 1.4; }
+  #todo-table tr.done td.col-text { color: #b0b0b6; text-decoration: line-through; }
+  #todo-table input[type="checkbox"] { accent-color: var(--deep); cursor: pointer; }
+  #todo-table button.del {
+    border: 0; background: none; color: #c9c9cf; cursor: pointer; font-size: 14px; line-height: 1; padding: 0;
+  }
+  #todo-table button.del:hover { color: #d06b6b; }
+  #todo-table tr.group td {
+    padding: 14px 6px 4px;
+    font-size: 11px;
+    letter-spacing: .4px;
+    color: #8a8a92;
+    border-bottom: 0;
+  }
+  #todo-table tr.group td .n { color: #b3b3ba; margin-left: 6px; }
+  .empty-note { font-size: 12.5px; color: var(--sub); margin: 6px 2px 0; }
+  /* dialog */
+  dialog {
+    width: min(92vw, 380px);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 22px;
+    color: var(--ink);
+    font-family: inherit;
+  }
+  dialog::backdrop { background: rgba(20, 20, 20, .28); }
+  dialog h3 { margin: 0 0 16px; font-size: 16px; font-weight: 600; }
+  .hw-course { margin: -8px 0 12px; font-size: 12.5px; color: var(--sub); }
+  dialog label { display: block; font-size: 12.5px; color: var(--sub); margin: 10px 0 4px; }
+  dialog input, dialog select {
+    width: 100%;
+    padding: 9px 10px;
+    font-size: 14px;
+    font-family: inherit;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    outline: none;
+    background: #fff;
+  }
+  dialog input:focus, dialog select:focus { border-color: var(--mid); }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .actions { display: flex; gap: 8px; margin-top: 20px; }
+  .actions button {
+    flex: 1;
+    padding: 10px;
+    font-size: 14px;
+    font-family: inherit;
+    border-radius: 9px;
+    cursor: pointer;
+    border: 1px solid var(--line);
+    background: #fff;
+    color: var(--ink);
+  }
+  .actions button.primary { background: var(--deep); border-color: var(--deep); color: #fff; }
+  .actions button.danger { color: #b5483f; border-color: #e8cdc9; }
+  @media (max-width: 860px) {
+    .layout { grid-template-columns: minmax(0, 1fr); }
+    .side { position: static; }
+    .app { padding: 24px 16px 40px; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="headline">
+      <h1>我的课表</h1>
+      <div class="tools">
+        <button id="btn-sync" type="button">同步课表</button>
+        <button id="btn-xlsx" type="button">导入 Excel</button>
+        <button id="btn-export" type="button">导出</button>
+        <button id="btn-import" type="button">导入</button>
+        <input id="file-import" type="file" accept=".json,application/json" hidden>
+        <input id="file-xlsx" type="file" accept=".xlsx" hidden>
+      </div>
+    </div>
+    <div class="weeknav">
+      <button id="week-prev" type="button" title="上一周">‹</button>
+      <span id="week-label">第 8 周</span>
+      <button id="week-next" type="button" title="下一周">›</button>
+      <button id="week-now" type="button" class="ghostbtn" hidden>回到本周</button>
+      <span id="week-meta"></span>
+    </div>
+  </header>
+
+  <section class="today" id="today"></section>
+
+  <div class="layout">
+    <section class="board-wrap">
+      <div class="board" id="board"></div>
+    </section>
+
+    <aside class="side">
+      <h2>待办</h2>
+      <form id="todo-form" autocomplete="off">
+        <input id="todo-input" maxlength="60" placeholder="团课记录 / 高数 3.4 习题…">
+        <button type="submit">添加</button>
+      </form>
+      <table id="todo-table">
+        <thead>
+          <tr><th>待办</th><th class="col-course">课程</th><th class="col-done">✓</th><th class="col-del"></th></tr>
+        </thead>
+        <tbody id="todo-body"></tbody>
+      </table>
+      <p class="empty-note" id="todo-empty">还没有待办。</p>
+      <p class="empty-note" id="storage-note" hidden>这个浏览器不允许本地保存，刷新后改动会丢。</p>
+    </aside>
+  </div>
+</div>
+
+<dialog id="hw-dlg">
+  <h3>记作业</h3>
+  <p class="hw-course" id="hw-course"></p>
+  <label>作业 / 要交的东西</label>
+  <input id="hw-text" maxlength="60" placeholder="例如：习题 3.4 第 5 题">
+  <div class="actions">
+    <button type="button" id="hw-cancel">取消</button>
+    <button type="button" id="hw-save" class="primary">加进待办</button>
+  </div>
+</dialog>
+
+<dialog id="dlg">
+  <h3 id="dlg-title">添加课程</h3>
+  <form id="dlg-form" method="dialog">
+    <label>课程名</label>
+    <input id="f-name" required maxlength="24" placeholder="例如：C 语言">
+    <label>地点（可空）</label>
+    <input id="f-place" maxlength="24" placeholder="例如：N8614">
+    <div class="row2">
+      <div>
+        <label>星期</label>
+        <select id="f-day"></select>
+      </div>
+      <div>
+        <label>节次</label>
+        <select id="f-slot"></select>
+      </div>
+    </div>
+    <div class="actions">
+      <button type="button" id="btn-cancel">取消</button>
+      <button type="button" id="btn-delete" class="danger" hidden>删除</button>
+      <button type="submit" class="primary">保存</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+(function () {
+  const DAYS = ['周一', '周二', '周三', '周四', '周五', '周六'];
+  const SLOTS = [
+    { id: '1-2',  label: '1–2',  tier: 'am' },
+    { id: '3-4',  label: '3–4',  tier: 'am' },
+    { id: '5-6',  label: '5–6',  tier: 'pm' },
+    { id: '7-8',  label: '7–8',  tier: 'pm' },
+    { id: '9-10', label: '9–10', tier: 'eve' }
+  ];
+  const KEY = 'timetable.v2';
+
+  // ==== 课表数据：由 tools/build_term_data.py 从教务导出生成，勿手改 ====
+  // @TERM_META_START
+  const TERM_META = {"term": "2026-2027-1", "generatedAt": "2026-10-26T21:55:15", "source": "导出数据.xls"};
+  // @TERM_META_END
+  // @TERM_DATA_START
+  const TERM_DATA = [
+    {"name": "你的知识需要管理", "day": 5, "from": "5", "to": "6", "weeks": [5, 6, 7, 8, 9, 10, 11, 12, 13, 14], "room": "N8220"},
+    {"name": "机械类专业导论", "day": 3, "from": "5", "to": "6", "weeks": [11], "room": "N8117"},
+    {"name": "机械类专业导论", "day": 3, "from": "5", "to": "6", "weeks": [3], "room": "N8313"},
+    {"name": "机械类专业导论", "day": 3, "from": "5", "to": "6", "weeks": [5], "room": "N8313"},
+    {"name": "机械类专业导论", "day": 3, "from": "5", "to": "6", "weeks": [6], "room": "N8117"},
+    {"name": "机械类专业导论", "day": 3, "from": "5", "to": "6", "weeks": [7, 8], "room": "N8117"},
+    {"name": "机械类专业导论", "day": 3, "from": "5", "to": "6", "weeks": [9, 10], "room": "N8117"},
+    {"name": "工程制图（甲）", "day": 1, "from": "3", "to": "4", "weeks": [3, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17], "room": "N8008"},
+    {"name": "工程制图（甲）", "day": 1, "from": "3", "to": "4", "weeks": [4], "room": "N8008"},
+    {"name": "工程制图（甲）", "day": 3, "from": "1", "to": "2", "weeks": [3, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17], "room": "N8008"},
+    {"name": "工程制图（甲）", "day": 0, "from": "5", "to": "8", "weeks": [18], "room": "机电楼101"},
+    {"name": "工程制图（甲）", "day": 2, "from": "9", "to": "10", "weeks": [17, 18], "room": "机电楼101"},
+    {"name": "工程制图（甲）", "day": 2, "from": "9", "to": "10", "weeks": [13, 14, 15, 16], "room": "N8008"},
+    {"name": "程序设计（C语言）", "day": 2, "from": "1", "to": "2", "weeks": [3, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], "room": "N8614"},
+    {"name": "程序设计（C语言）", "day": 2, "from": "1", "to": "2", "weeks": [4], "room": "N8614"},
+    {"name": "程序设计（C语言）", "day": 4, "from": "5", "to": "6", "weeks": [5, 7, 9, 10, 11, 13], "room": "N8614"},
+    {"name": "程序设计（C语言）", "day": 1, "from": "1", "to": "2", "weeks": [6, 7, 8, 9, 10, 11, 12, 13, 14], "room": "计算机机房104-A"},
+    {"name": "程序设计（C语言）", "day": 1, "from": "1", "to": "2", "weeks": [4], "room": "计算机机房104-A"},
+    {"name": "中国通史专题", "day": 0, "from": "7", "to": "8", "weeks": [4], "room": "N3212"},
+    {"name": "中国通史专题", "day": 0, "from": "7", "to": "8", "weeks": [6, 7, 8, 9, 10, 11, 12, 13, 14], "room": "N3212"},
+    {"name": "高等数学甲I（上）", "day": 0, "from": "1", "to": "2", "weeks": [3, 4, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18], "room": "N8623"},
+    {"name": "高等数学甲I（上）", "day": 2, "from": "3", "to": "4", "weeks": [3, 4, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18], "room": "N8623"},
+    {"name": "高等数学甲I（上）", "day": 3, "from": "7", "to": "8", "weeks": [3], "room": "N8403"},
+    {"name": "高等数学甲I（上）", "day": 4, "from": "3", "to": "4", "weeks": [5, 6, 7, 9, 10, 11, 12, 13, 14, 15, 16, 18], "room": "N8623"},
+    {"name": "高等数学甲I（上）", "day": 5, "from": "9", "to": "10", "weeks": [9], "room": "N8103"},
+    {"name": "思想道德与法治", "day": 0, "from": "5", "to": "6", "weeks": [4], "room": "N8320"},
+    {"name": "思想道德与法治", "day": 1, "from": "7", "to": "8", "weeks": [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18], "room": "N8320"},
+    {"name": "思想道德与法治", "day": 3, "from": "3", "to": "4", "weeks": [7, 8, 9, 10, 11, 12], "room": "N8320"},
+    {"name": "形势与政策", "day": 0, "from": "9", "to": "10", "weeks": [8, 9, 10, 11], "room": "N8T04"},
+    {"name": "大学英语（Ⅰ）", "day": 0, "from": "3", "to": "4", "weeks": [3, 4, 7, 11, 13, 15, 17], "room": "N8202"},
+    {"name": "大学英语（Ⅰ）", "day": 4, "from": "1", "to": "2", "weeks": [10], "room": "N8114"},
+    {"name": "大学英语（Ⅰ）", "day": 0, "from": "3", "to": "4", "weeks": [6, 8, 10, 12, 14, 16, 18], "room": "N8202"},
+    {"name": "大学英语（Ⅰ）", "day": 4, "from": "1", "to": "2", "weeks": [11], "room": "N8202"},
+    {"name": "体育Ⅰ", "day": 2, "from": "5", "to": "6", "weeks": [3, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18], "room": "五人制足球场"},
+    {"name": "体育Ⅰ", "day": 2, "from": "5", "to": "6", "weeks": [4], "room": "五人制足球场"},
+    {"name": "军事理论", "day": 0, "from": "9", "to": "10", "weeks": [1, 2], "room": "N8307"},
+    {"name": "军事理论", "day": 1, "from": "1", "to": "2", "weeks": [3], "room": "N8206"},
+    {"name": "军事理论", "day": 4, "from": "1", "to": "2", "weeks": [5, 6, 7, 8, 9], "room": "N8206"},
+    {"name": "大学生心理健康与发展", "day": 1, "from": "5", "to": "6", "weeks": [3, 6, 7, 8, 9, 10, 11], "room": "N8403"},
+    {"name": "大学生心理健康与发展", "day": 1, "from": "5", "to": "6", "weeks": [4], "room": "N8403"},
+  ];
+  // @TERM_DATA_END
+
+  function slotOf(from, to) {
+    const f = Number(from);
+    if (f <= 2) return '1-2';
+    if (f <= 4) return '3-4';
+    if (f <= 6) return '5-6';
+    if (f <= 8) return '7-8';
+    return '9-10';
+  }
+
+  function coursesOfWeek(week) {
+    return TERM_DATA
+      .filter(e => e.weeks.indexOf(week) !== -1)
+      .map((e, i) => ({
+        id: 'g' + week + '-' + i,
+        day: e.day,
+        slot: slotOf(e.from, e.to),
+        name: e.name,
+        place: e.room || '',
+        span: (Number(e.to) - Number(e.from) > 1) ? (e.from + '–' + e.to + ' 节') : ''
+      }));
+  }
+
+  // 学期第 1 周周一 = 2026-09-07（按教务第 7 周 = 10-19 反推）
+  const TERM_START = new Date(2026, 8, 7);
+
+  // 导入的教务表格覆盖内置数据（存本地，刷新后仍生效）
+  const TERM_KEY = 'timetable.term.v1';
+  function loadTermOverride() {
+    try {
+      const raw = localStorage.getItem(TERM_KEY);
+      if (!raw) return;
+      const t = JSON.parse(raw);
+      if (t && Array.isArray(t.entries) && t.entries.length) {
+        TERM_DATA.length = 0;
+        t.entries.forEach(e => TERM_DATA.push(e));
+        if (t.meta) Object.assign(TERM_META, t.meta);
+      }
+    } catch (e) { /* 坏数据忽略 */ }
+  }
+
+  loadTermOverride();
+
+  let state = load();
+  const board = document.getElementById('board');
+  const dlg = document.getElementById('dlg');
+  const fName = document.getElementById('f-name');
+  const fPlace = document.getElementById('f-place');
+  const fDay = document.getElementById('f-day');
+  const fSlot = document.getElementById('f-slot');
+  const dlgTitle = document.getElementById('dlg-title');
+  const btnDelete = document.getElementById('btn-delete');
+  let editingId = null;
+  const hwDlg = document.getElementById('hw-dlg');
+  let hwCourse = null;
+
+  function uid() { return Math.random().toString(36).slice(2, 9); }
+
+  function load() {
+    const week = currentWeek();
+    let todos = [];
+    try {
+      const raw = localStorage.getItem(KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && Array.isArray(parsed.todos)) todos = parsed.todos;
+        // 同一周内保留手动改过的课表；换周了按新周重新生成
+        if (parsed && parsed.week === week && Array.isArray(parsed.courses) && parsed.courses.length) {
+          return { week: week, courses: parsed.courses, todos: todos };
+        }
+      }
+    } catch (e) { /* 坏数据就当没存过 */ }
+    return { week: week, courses: coursesOfWeek(week), todos: todos };
+  }
+
+  function save() {
+    try {
+      localStorage.setItem(KEY, JSON.stringify(state));
+    } catch (e) {
+      const note = document.getElementById('storage-note');
+      if (note) note.hidden = false;
+    }
+  }
+
+  // 地点 → 楼。「N8623」取 N8；「计算机机房 104-A」「五人制足球场」整串当一栋楼。
+  function buildingOf(place) {
+    const p = (place || '').trim();
+    if (!p) return '';
+    const m = p.match(/^N(\d)/i);
+    return m ? 'N' + m[1] : p;
+  }
+
+  function tierOf(slotId) {    const s = SLOTS.find(x => x.id === slotId);
+    return s ? s.tier : 'pm';
+  }
+
+  // 当前正在看第几周；只有"本周"允许编辑
+  let viewWeek = currentWeek();
+  function isViewingCurrent() { return viewWeek === currentWeek(); }
+  function listForView() {
+    return isViewingCurrent() ? state.courses : coursesOfWeek(viewWeek);
+  }
+
+  function courseAt(day, slot) {
+    return listForView().find(c => c.day === day && c.slot === slot) || null;
+  }
+
+  function currentWeek() {
+    const now = new Date();
+    const a = new Date(TERM_START.getFullYear(), TERM_START.getMonth(), TERM_START.getDate());
+    const b = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    return Math.max(1, Math.floor((b - a) / 86400000 / 7) + 1);
+  }
+
+
+  function esc(s) {
+    return String(s).replace(/[&<>"]/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[m]));
+  }
+
+  // JS 的 getDay(): 0 = 周日。课表只有周一到周六，周日返回 -1。
+  function todayIndex() {
+    const d = new Date().getDay();
+    return d === 0 ? -1 : d - 1;
+  }
+
+  function coursesOfDay(day) {
+    return listForView()
+      .filter(c => c.day === day)
+      .sort((a, b) => SLOTS.findIndex(s => s.id === a.slot) - SLOTS.findIndex(s => s.id === b.slot));
+  }
+
+  function renderToday() {
+    const box = document.getElementById('today');
+    const ti = todayIndex();
+    const openCount = state.todos.filter(t => !t.done).length;
+    const d = new Date();
+    const dateStr = (d.getMonth() + 1) + ' 月 ' + d.getDate() + ' 日';
+    let html = '';
+
+    // 看别的周时，"今天"条改成这一周的概览
+    if (!isViewingCurrent()) {
+      const weekList = listForView()
+        .slice()
+        .sort((a, b) => (a.day - b.day) || (SLOTS.findIndex(s => s.id === a.slot) - SLOTS.findIndex(s => s.id === b.slot)));
+      html += '<div class="today-head"><h2>第 ' + viewWeek + ' 周</h2>'
+            + '<span>' + weekList.length + ' 节课　待办未完成 ' + openCount + ' 件　'
+            + '<a href="#" id="back-now">回到本周</a></span></div>';
+      html += '<div class="today-list">' + weekList.map((c) =>
+        '<div class="today-item">'
+        + '<span class="t">' + esc(c.name) + '</span>'
+        + '<span class="s">' + DAYS[c.day] + ' ' + c.slot + ' 节 · ' + esc(c.place || '地点待填') + '</span>'
+        + '</div>'
+      ).join('') + '</div>';
+      box.innerHTML = html;
+      const back = document.getElementById('back-now');
+      if (back) back.addEventListener('click', e => { e.preventDefault(); goWeek(currentWeek()); });
+      return;
+    }
+
+    if (ti < 0) {
+      html += '<div class="today-head"><h2>今天 · 周日</h2>'
+            + '<span>' + dateStr + '　待办未完成 ' + openCount + ' 件</span></div>'
+            + '<p class="today-empty">今天没有课。</p>';
+    } else {
+      const list = coursesOfDay(ti);
+      html += '<div class="today-head"><h2>今天 · ' + DAYS[ti] + '</h2>'
+            + '<span>' + dateStr + '　' + list.length + ' 节课　待办未完成 ' + openCount + ' 件</span></div>';
+      if (!list.length) {
+        html += '<p class="today-empty">今天没有课，可以在待办里把下周要交的先写下来。</p>';
+      } else {
+        html += '<div class="today-list">' + list.map((c, i) =>
+          '<div class="today-item">'
+          + '<span class="t">' + esc(c.name) + '</span>'
+          + '<span class="s">' + c.slot + ' 节 · ' + esc(c.place || '地点待填') + '</span>'
+          + '<button type="button" data-i="' + i + '">记作业</button>'
+          + '</div>'
+        ).join('') + '</div>';
+      }
+    }
+
+    box.innerHTML = html;
+    box.querySelectorAll('button[data-i]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const list = coursesOfDay(ti);
+        const c = list[Number(btn.dataset.i)];
+        if (c) openHw(c.name);
+      });
+    });
+  }
+
+  function openHw(courseName) {
+    hwCourse = courseName;
+    document.getElementById('hw-course').textContent = courseName;
+    const input = document.getElementById('hw-text');
+    input.value = '';
+    hwDlg.showModal();
+    input.focus();
+  }
+
+  function goWeek(w) {
+    const max = 18;
+    viewWeek = Math.min(max, Math.max(1, w));
+    render();
+  }
+
+  function render() {
+    board.innerHTML = '';
+
+    // 周导航
+    const viewing = isViewingCurrent();
+    document.getElementById('week-label').textContent = '第 ' + viewWeek + ' 周' + (viewing ? '' : '（只读）');
+    const stamp = TERM_META.generatedAt ? TERM_META.generatedAt.slice(0, 10) : '未同步';
+    document.getElementById('week-meta').textContent = '数据：教务导出 ' + stamp;
+    document.getElementById('week-prev').disabled = viewWeek <= 1;
+    document.getElementById('week-next').disabled = viewWeek >= 18;
+    document.getElementById('week-now').hidden = viewing;
+    board.classList.toggle('viewonly', !viewing);
+
+    // 同一天里，和上一节比「楼」变了才标；每天第一节不标。
+    // 规则：N 后面第一位是楼号（N8623 → 8 号楼）；非 N 开头的地点（机房、足球场）整串当作一栋楼。
+    const movedIds = new Set();
+    DAYS.forEach((_, day) => {
+      let prevBuilding = null;
+      SLOTS.forEach(s => {
+        const c = courseAt(day, s.id);
+        if (!c) return;
+        const building = buildingOf(c.place);
+        if (!building) { prevBuilding = null; return; }   // 地点未知，链条断开
+        if (prevBuilding && building !== prevBuilding) movedIds.add(c.id);
+        prevBuilding = building;
+      });
+    });
+
+    const corner = document.createElement('div');
+    corner.className = 'corner';
+    corner.textContent = '节次';
+    board.appendChild(corner);
+
+    DAYS.forEach((d, i) => {
+      const h = document.createElement('div');
+      h.className = 'dayhead' + (i >= 5 ? ' weekend' : '');
+      h.textContent = d;
+      board.appendChild(h);
+    });
+
+    SLOTS.forEach(slot => {
+      const lab = document.createElement('div');
+      lab.className = 'slotlabel';
+      lab.textContent = slot.label;
+      board.appendChild(lab);
+
+      DAYS.forEach((_, day) => {
+        const course = courseAt(day, slot.id);
+        const cell = document.createElement('button');
+        cell.type = 'button';
+        cell.dataset.day = String(day);
+        cell.dataset.slot = slot.id;
+        cell.className = 'cell ' + (course
+          ? 'filled ' + slot.tier + (movedIds.has(course.id) ? ' moved' : '')
+          : 'empty');
+        if (course) {
+          if (viewing) {
+            cell.dataset.id = course.id;
+            cell.draggable = true;
+          }
+          const n = document.createElement('span');
+          n.className = 'course';
+          n.textContent = course.name;
+          cell.appendChild(n);
+          const p = document.createElement('span');
+          p.className = 'place' + (course.place ? '' : ' missing');
+          p.textContent = course.place || '地点待填';
+          cell.appendChild(p);
+          if (course.span) {
+            const a = document.createElement('span');
+            a.className = 'adjust';
+            a.textContent = course.span;
+            cell.appendChild(a);
+          }
+          if (viewing) cell.addEventListener('click', () => openDialog(course));
+        } else {
+          if (viewing) cell.addEventListener('click', () => openDialog(null, day, slot.id));
+        }
+        board.appendChild(cell);
+      });
+    });
+
+    renderTodos();
+    renderToday();
+  }
+
+  function courseOrder() {
+    const seen = [];
+    DAYS.forEach((_, d) => SLOTS.forEach(s => {
+      const c = courseAt(d, s.id);
+      if (c && seen.indexOf(c.name) === -1) seen.push(c.name);
+    }));
+    return seen;
+  }
+
+
+  // 待办表：按课程分组，同一门课里文字相同的合并成一行（×N），勾选/删除作用于整行
+  function renderTodos() {
+    const body = document.getElementById('todo-body');
+    const empty = document.getElementById('todo-empty');
+    body.innerHTML = '';
+
+    if (!state.todos.length) {
+      empty.hidden = false;
+      return;
+    }
+    empty.hidden = true;
+
+    const groups = new Map();
+    state.todos.forEach(t => {
+      const key = (t.course && t.course.trim()) ? t.course.trim() : '其他';
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(t);
+    });
+
+    const order = courseOrder();
+    const keys = [...groups.keys()].sort((a, b) => {
+      const ia = order.indexOf(a), ib = order.indexOf(b);
+      if (ia === -1 && ib === -1) return a === '其他' ? 1 : (b === '其他' ? -1 : 0);
+      if (ia === -1) return 1;
+      if (ib === -1) return -1;
+      return ia - ib;
+    });
+
+    keys.forEach(key => {
+      const items = groups.get(key);
+      const openCount = items.filter(t => !t.done).length;
+
+      const gr = document.createElement('tr');
+      gr.className = 'group';
+      const gc = document.createElement('td');
+      gc.colSpan = 4;
+      gc.textContent = key;
+      const n = document.createElement('span');
+      n.className = 'n';
+      n.textContent = openCount ? ('未完成 ' + openCount + ' / ' + items.length) : '全部完成';
+      gc.appendChild(n);
+      gr.appendChild(gc);
+      body.appendChild(gr);
+
+      // 合并同类项
+      const buckets = new Map();
+      items.forEach(t => {
+        const k = t.text.trim();
+        if (!buckets.has(k)) buckets.set(k, []);
+        buckets.get(k).push(t);
+      });
+
+      buckets.forEach((bucket, text) => {
+        const allDone = bucket.every(t => t.done);
+
+        const tr = document.createElement('tr');
+        if (allDone) tr.className = 'done';
+
+        const tdText = document.createElement('td');
+        tdText.className = 'col-text';
+        tdText.textContent = text;
+        if (bucket.length > 1) {
+          const cnt = document.createElement('span');
+          cnt.className = 'n';
+          cnt.textContent = ' ×' + bucket.length;
+          tdText.appendChild(cnt);
+        }
+
+        const tdCourse = document.createElement('td');
+        tdCourse.className = 'col-course';
+        tdCourse.textContent = key === '其他' ? '—' : key;
+
+        const tdDone = document.createElement('td');
+        tdDone.className = 'col-done';
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.checked = allDone;
+        cb.title = allDone ? '点一下标成未完成' : '点一下标成完成';
+        cb.addEventListener('change', () => {
+          bucket.forEach(t => { t.done = cb.checked; });
+          save();
+          renderTodos();
+          renderToday();
+        });
+        tdDone.appendChild(cb);
+
+        const tdDel = document.createElement('td');
+        tdDel.className = 'col-del';
+        const del = document.createElement('button');
+        del.type = 'button';
+        del.className = 'del';
+        del.textContent = '×';
+        del.title = '删除';
+        del.addEventListener('click', () => {
+          const ids = bucket.map(t => t.id);
+          state.todos = state.todos.filter(x => ids.indexOf(x.id) === -1);
+          save();
+          renderTodos();
+          renderToday();
+        });
+        tdDel.appendChild(del);
+
+        tr.appendChild(tdText);
+        tr.appendChild(tdCourse);
+        tr.appendChild(tdDone);
+        tr.appendChild(tdDel);
+        body.appendChild(tr);
+      });
+    });
+  }
+
+  function openDialog(course, day, slot) {
+    editingId = course ? course.id : null;
+    dlgTitle.textContent = course ? '修改课程' : '添加课程';
+    btnDelete.hidden = !course;
+
+    fName.value = course ? course.name : '';
+    fPlace.value = course ? (course.place || '') : '';
+    fDay.value = String(course ? course.day : day);
+    fSlot.value = course ? course.slot : slot;
+
+    dlg.showModal();
+    fName.focus();
+  }
+
+  document.getElementById('dlg-form').addEventListener('submit', e => {
+    e.preventDefault();
+    const name = fName.value.trim();
+    if (!name) return;
+    const day = Number(fDay.value);
+    const slot = fSlot.value;
+
+    const occupant = state.courses.find(c => c.day === day && c.slot === slot && c.id !== editingId);
+    if (occupant) {
+      if (!confirm('那一格已经有「' + occupant.name + '」，要替换成「' + name + '」吗？')) return;
+      state.courses = state.courses.filter(c => c.id !== occupant.id);
+    }
+
+    if (editingId) {
+      const target = state.courses.find(c => c.id === editingId);
+      if (target) { target.name = name; target.place = fPlace.value.trim(); target.day = day; target.slot = slot; }
+    } else {
+      state.courses.push({ id: uid(), name: name, place: fPlace.value.trim(), day: day, slot: slot });
+    }
+
+    save();
+    render();
+    dlg.close();
+  });
+
+  btnDelete.addEventListener('click', () => {
+    if (!editingId) return;
+    state.courses = state.courses.filter(c => c.id !== editingId);
+    save();
+    render();
+    dlg.close();
+  });
+
+  document.getElementById('btn-cancel').addEventListener('click', () => dlg.close());
+
+  // ---- 周导航 ----
+  document.getElementById('week-prev').addEventListener('click', () => goWeek(viewWeek - 1));
+  document.getElementById('week-next').addEventListener('click', () => goWeek(viewWeek + 1));
+  document.getElementById('week-now').addEventListener('click', () => goWeek(currentWeek()));
+
+  // ---- 同步：用教务数据重新生成本周 ----
+  document.getElementById('btn-sync').addEventListener('click', () => {
+    const week = currentWeek();
+    if (!confirm('用教务数据重新生成本周（第 ' + week + ' 周）课表？本周里手动加的课会被清掉，待办不动。')) return;
+    state.week = week;
+    state.courses = coursesOfWeek(week);
+    viewWeek = week;
+    save();
+    render();
+  });
+
+  // ---- 导入 Excel（.xlsx）----
+  const DAY_MAP = { '星期一': 0, '星期二': 1, '星期三': 2, '星期四': 3, '星期五': 4, '星期六': 5, '星期日': 6, '星期天': 6 };
+
+  function expandWeeks(spec) {
+    const out = [];
+    String(spec || '').replace(/，/g, ',').split(',').forEach(tok => {
+      const m = tok.trim().match(/^(\d+)(?:\s*-\s*(\d+))?\s*周\s*(?:[（(]([单双])[)）])?$/);
+      if (!m) return;
+      const a = Number(m[1]);
+      const b = Number(m[2] || m[1]);
+      const parity = m[3];
+      for (let w = a; w <= b; w++) {
+        if (parity === '单' && w % 2 === 0) continue;
+        if (parity === '双' && w % 2 === 1) continue;
+        if (out.indexOf(w) === -1) out.push(w);
+      }
+    });
+    return out.sort((x, y) => x - y);
+  }
+
+  function u16(dv, o) { return dv.getUint16(o, true); }
+  function u32(dv, o) { return dv.getUint32(o, true); }
+
+  function readZipIndex(buf) {
+    const dv = new DataView(buf);
+    let eocd = -1;
+    const stop = Math.max(0, buf.byteLength - 66000);
+    for (let i = buf.byteLength - 22; i >= stop; i--) {
+      if (u32(dv, i) === 0x06054b50) { eocd = i; break; }
+    }
+    if (eocd < 0) throw new Error('这不是 xlsx（找不到压缩包结构）。旧版 .xls 请先另存为 .xlsx');
+    const count = u16(dv, eocd + 10);
+    let off = u32(dv, eocd + 16);
+    const files = {};
+    for (let k = 0; k < count; k++) {
+      if (u32(dv, off) !== 0x02014b50) break;
+      const method = u16(dv, off + 10);
+      const csize = u32(dv, off + 20);
+      const nameLen = u16(dv, off + 28);
+      const extraLen = u16(dv, off + 30);
+      const commentLen = u16(dv, off + 32);
+      const lho = u32(dv, off + 42);
+      const name = new TextDecoder().decode(new Uint8Array(buf, off + 46, nameLen));
+      files[name] = { method: method, csize: csize, lho: lho };
+      off += 46 + nameLen + extraLen + commentLen;
+    }
+    return { dv: dv, buf: buf, files: files };
+  }
+
+  async function readZipFile(zip, name) {
+    const e = zip.files[name];
+    if (!e) return null;
+    const nameLen = u16(zip.dv, e.lho + 26);
+    const extraLen = u16(zip.dv, e.lho + 28);
+    const start = e.lho + 30 + nameLen + extraLen;
+    const data = new Uint8Array(zip.buf, start, e.csize);
+    if (e.method === 0) return new TextDecoder('utf-8').decode(data);
+    if (e.method !== 8) throw new Error('不支持的压缩方式：' + e.method);
+    if (typeof DecompressionStream === 'undefined') throw new Error('这个浏览器太旧，不支持解压 xlsx');
+    const stream = new Blob([data]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+    const out = await new Response(stream).arrayBuffer();
+    return new TextDecoder('utf-8').decode(out);
+  }
+
+  function colIndex(ref) {
+    const m = String(ref || '').match(/^([A-Z]+)/);
+    if (!m) return -1;
+    let n = 0;
+    for (const ch of m[1]) n = n * 26 + (ch.charCodeAt(0) - 64);
+    return n - 1;
+  }
+
+  async function parseXlsxRows(buf) {
+    const zip = readZipIndex(buf);
+    const sharedXml = await readZipFile(zip, 'xl/sharedStrings.xml');
+    const shared = [];
+    if (sharedXml) {
+      const doc = new DOMParser().parseFromString(sharedXml, 'application/xml');
+      Array.prototype.forEach.call(doc.getElementsByTagName('si'), si => shared.push(si.textContent));
+    }
+    let sheetXml = await readZipFile(zip, 'xl/worksheets/sheet1.xml');
+    if (!sheetXml) {
+      const alt = Object.keys(zip.files).filter(n => /^xl\/worksheets\/sheet\d+\.xml$/.test(n)).sort()[0];
+      if (alt) sheetXml = await readZipFile(zip, alt);
+    }
+    if (!sheetXml) throw new Error('xlsx 里没找到工作表');
+
+    const doc = new DOMParser().parseFromString(sheetXml, 'application/xml');
+    const rows = [];
+    Array.prototype.forEach.call(doc.getElementsByTagName('row'), r => {
+      const arr = [];
+      Array.prototype.forEach.call(r.getElementsByTagName('c'), c => {
+        const idx = colIndex(c.getAttribute('r'));
+        const t = c.getAttribute('t');
+        let val = '';
+        if (t === 's') {
+          const v = c.getElementsByTagName('v')[0];
+          val = v ? (shared[Number(v.textContent)] || '') : '';
+        } else if (t === 'inlineStr') {
+          val = c.textContent;
+        } else {
+          const v = c.getElementsByTagName('v')[0];
+          val = v ? v.textContent : '';
+        }
+        const at = idx >= 0 ? idx : arr.length;
+        arr[at] = String(val).trim();
+      });
+      rows.push(arr);
+    });
+    return rows;
+  }
+
+  function rowsToEntries(rows) {
+    const hi = rows.findIndex(r => r && r.some(v => String(v || '').trim() === '课程名'));
+    if (hi < 0) throw new Error('表头里没找到「课程名」列');
+    const head = rows[hi].map(v => String(v || '').trim());
+    const col = name => head.indexOf(name);
+    const C = {
+      name: col('课程名'),
+      weeks: col('上课周次'),
+      day: col('上课星期'),
+      from: col('开始节次'),
+      to: col('结束节次'),
+      room: col('教室名称')
+    };
+    if (C.name < 0 || C.weeks < 0 || C.day < 0) throw new Error('缺少必要列（课程名 / 上课周次 / 上课星期）');
+
+    const entries = [];
+    for (let i = hi + 1; i < rows.length; i++) {
+      const r = rows[i] || [];
+      const name = String(r[C.name] || '').replace('【本】', '').trim();
+      if (!name) continue;
+      const day = DAY_MAP[String(r[C.day] || '').trim()];
+      const weeks = expandWeeks(r[C.weeks]);
+      if (day === undefined || !weeks.length) continue;
+      const from = String(r[C.from] || '').replace(/\D/g, '');
+      const to = String(r[C.to] || '').replace(/\D/g, '') || from;
+      entries.push({
+        name: name,
+        day: day,
+        from: from,
+        to: to,
+        weeks: weeks,
+        room: C.room >= 0 ? String(r[C.room] || '').trim() : ''
+      });
+    }
+    if (!entries.length) throw new Error('没解析出任何课程，检查表格列名');
+    return entries;
+  }
+
+  document.getElementById('btn-xlsx').addEventListener('click', () => {
+    document.getElementById('file-xlsx').click();
+  });
+
+  document.getElementById('file-xlsx').addEventListener('change', async e => {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    if (!/\.xlsx$/i.test(file.name)) {
+      alert('只认 .xlsx。旧版 .xls 请在 Excel / WPS 里「另存为」.xlsx 再导入。');
+      return;
+    }
+    try {
+      const rows = await parseXlsxRows(await file.arrayBuffer());
+      const entries = rowsToEntries(rows);
+      if (!confirm('识别到 ' + entries.length + ' 条课程记录（' + file.name + '），导入会覆盖现在的课表数据，继续吗？')) return;
+      TERM_DATA.length = 0;
+      entries.forEach(x => TERM_DATA.push(x));
+      TERM_META.generatedAt = new Date().toISOString().slice(0, 19);
+      TERM_META.source = file.name;
+      try {
+        localStorage.setItem(TERM_KEY, JSON.stringify({ entries: entries, meta: TERM_META }));
+      } catch (err) { /* 存不下也不影响本次显示 */ }
+      state.week = currentWeek();
+      state.courses = coursesOfWeek(currentWeek());
+      viewWeek = currentWeek();
+      save();
+      render();
+      alert('已导入 ' + entries.length + ' 条课程。');
+    } catch (err) {
+      alert('导入失败：' + err.message);
+    }
+  });
+
+  // ---- 导出 / 导入 ----
+  function parseImport(text) {
+    let data;
+    try { data = JSON.parse(text); } catch (e) { return null; }
+    if (!data || !Array.isArray(data.courses)) return null;
+    const coursesOK = data.courses.every(c =>
+      c && typeof c.name === 'string' && Number.isInteger(c.day) && c.day >= 0 && c.day <= 5 &&
+      typeof c.slot === 'string' && SLOTS.some(s => s.id === c.slot)
+    );
+    if (!coursesOK) return null;
+    const todos = Array.isArray(data.todos)
+      ? data.todos.filter(t => t && typeof t.text === 'string')
+          .map(t => ({ id: t.id || uid(), text: t.text, done: !!t.done, course: typeof t.course === 'string' ? t.course : '' }))
+      : [];
+    const courses = data.courses.map(c => ({
+      id: c.id || uid(), day: c.day, slot: c.slot, name: c.name, place: c.place || ''
+    }));
+    return { courses: courses, todos: todos };
+  }
+
+  document.getElementById('btn-export').addEventListener('click', () => {
+    const payload = {
+      app: 'timetable',
+      version: 3,
+      exportedAt: new Date().toISOString(),
+      courses: state.courses,
+      todos: state.todos
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const d = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    a.href = url;
+    a.download = '课表-' + d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) + '.json';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  });
+
+  document.getElementById('btn-import').addEventListener('click', () => {
+    document.getElementById('file-import').click();
+  });
+
+  document.getElementById('file-import').addEventListener('change', e => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const parsed = parseImport(String(reader.result));
+      if (!parsed) { alert('这个文件不是课表导出的数据，没有改动。'); return; }
+      if (!confirm('导入会覆盖现在的课表（' + parsed.courses.length + ' 门课）和待办，继续吗？')) return;
+      state.courses = parsed.courses;
+      state.todos = parsed.todos;
+      save();
+      render();
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  });
+
+  // ---- 拖拽换位（冲突规则沿用弹窗那套：占着就问你换不换） ----
+  function moveCourse(id, day, slot) {
+    const c = state.courses.find(x => x.id === id);
+    if (!c) return false;
+    if (c.day === day && c.slot === slot) return false;
+    const occupant = state.courses.find(x => x.day === day && x.slot === slot && x.id !== id);
+    if (occupant && !confirm('「' + occupant.name + '」在这一格，换成「' + c.name + '」吗？')) return false;
+    if (occupant) state.courses = state.courses.filter(x => x.id !== occupant.id);
+    c.day = day;
+    c.slot = slot;
+    save();
+    render();
+    return true;
+  }
+
+  board.addEventListener('dragstart', e => {
+    const cell = e.target.closest('.cell');
+    if (!cell || !cell.dataset.id) return;
+    e.dataTransfer.setData('text/plain', cell.dataset.id);
+    e.dataTransfer.effectAllowed = 'move';
+    cell.classList.add('dragging');
+  });
+
+  board.addEventListener('dragend', e => {
+    const cell = e.target.closest('.cell');
+    if (cell) cell.classList.remove('dragging');
+    board.querySelectorAll('.drop-hover').forEach(c => c.classList.remove('drop-hover'));
+  });
+
+  board.addEventListener('dragover', e => {
+    const cell = e.target.closest('.cell');
+    if (!cell) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    board.querySelectorAll('.drop-hover').forEach(c => { if (c !== cell) c.classList.remove('drop-hover'); });
+    cell.classList.add('drop-hover');
+  });
+
+  board.addEventListener('drop', e => {
+    const cell = e.target.closest('.cell');
+    if (!cell) return;
+    e.preventDefault();
+    board.querySelectorAll('.drop-hover').forEach(c => c.classList.remove('drop-hover'));
+    moveCourse(e.dataTransfer.getData('text/plain'), Number(cell.dataset.day), cell.dataset.slot);
+  });
+
+  document.getElementById('todo-form').addEventListener('submit', e => {
+    e.preventDefault();
+    const input = document.getElementById('todo-input');
+    const text = input.value.trim();
+    if (!text) return;
+    state.todos.push({ id: uid(), text: text, done: false });
+    input.value = '';
+    save();
+    renderTodos();
+    renderToday();
+  });
+
+  document.getElementById('hw-save').addEventListener('click', () => {
+    const input = document.getElementById('hw-text');
+    const text = input.value.trim();
+    if (!text) { input.focus(); return; }
+    state.todos.push({ id: uid(), text: text, done: false, course: hwCourse || '' });
+    save();
+    hwDlg.close();
+    renderTodos();
+    renderToday();
+  });
+
+  document.getElementById('hw-cancel').addEventListener('click', () => hwDlg.close());
+  document.getElementById('hw-text').addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); document.getElementById('hw-save').click(); }
+  });
+
+  SLOTS.forEach(s => {
+    const o = document.createElement('option');
+    o.value = s.id;
+    o.textContent = s.label + ' 节';
+    fSlot.appendChild(o);
+  });
+  DAYS.forEach((d, i) => {
+    const o = document.createElement('option');
+    o.value = String(i);
+    o.textContent = d;
+    fDay.appendChild(o);
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
+
+
+
