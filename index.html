@@ -1004,7 +1004,7 @@
     });
 
     html += '<p class="empty-note">' + (viewing
-      ? '点空格添加，点课卡修改；长按课卡可拖到同一天的其他节次。'
+      ? '点空格添加，点课卡修改；按住约半秒可拖到同一天的其他节次。'
       : '正在看第 ' + viewWeek + ' 周（只读）。') + '</p>';
 
     box.innerHTML = html;
@@ -1028,7 +1028,7 @@
     });
   }
 
-  // 长按 320ms 进入拖拽：短按仍是"点开修改"，手指先滑走则是滚动
+  // 长按 500ms 进入拖拽：短按仍是"点开修改"，手指先滑走则是滚动
   function attachTouchDrag(cell) {
     let timer = null;
     let startX = 0, startY = 0;
@@ -1083,6 +1083,11 @@
         dragging = true;
         suppressClick = true;
         enableBlock();
+        // 500ms 前后浏览器可能已经开始选词：进入拖拽就把已有的选区清掉
+        try {
+          const sel = window.getSelection && window.getSelection();
+          if (sel && sel.removeAllRanges) sel.removeAllRanges();
+        } catch (err) { /* 忽略 */ }
         document.body.classList.add('dragging');
         cell.classList.add('lifting');
 
@@ -1094,7 +1099,7 @@
         ghost.style.left = (r.left + r.width / 2) + 'px';
         ghost.style.top = (r.top + r.height / 2) + 'px';
         document.body.appendChild(ghost);
-      }, 320);
+      }, 500);
     });
 
     cell.addEventListener('pointermove', e => {
