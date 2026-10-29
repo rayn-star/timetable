@@ -186,6 +186,24 @@
   }
   .today-item button:hover { background: var(--mid); }
   .today-empty { font-size: 13px; color: var(--sub); margin: 0; }
+  /* 看别周时的概览卡：同门课合并一栏 */
+  .week-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(258px, 1fr));
+    gap: 8px;
+  }
+  .week-card {
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 9px 11px;
+    background: #fff;
+  }
+  .wc-top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+  .wc-name { font-size: 13px; font-weight: 600; }
+  .wc-count { font-size: 11px; color: #9a9aa2; white-space: nowrap; }
+  .wc-slots { margin-top: 4px; font-size: 11.5px; color: var(--sub); line-height: 1.7; }
+  .wc-slots .room { color: #4d7161; margin-left: 4px; }
+  .wc-slots .sep { color: #d6d6da; margin: 0 5px; }
   .tag {
     font-size: 11px;
     font-style: normal;
@@ -592,20 +610,33 @@
     const dateStr = (d.getMonth() + 1) + ' 月 ' + d.getDate() + ' 日';
     let html = '';
 
-    // 看别的周时，"今天"条改成这一周的概览
+    // 看别的周时，"今天"条改成这一周的概览：同门课合并成一栏，显示这周上几次、分别是哪几节
     if (!isViewingCurrent()) {
       const weekList = listForView()
         .slice()
         .sort((a, b) => (a.day - b.day) || (SLOTS.findIndex(s => s.id === a.slot) - SLOTS.findIndex(s => s.id === b.slot)));
+
+      const groups = new Map();
+      weekList.forEach(c => {
+        if (!groups.has(c.name)) groups.set(c.name, []);
+        groups.get(c.name).push(c);
+      });
+
       html += '<div class="today-head"><h2>第 ' + viewWeek + ' 周</h2>'
-            + '<span>' + weekList.length + ' 节课　待办未完成 ' + openCount + ' 件　'
+            + '<span>' + groups.size + ' 门课 · ' + weekList.length + ' 节课　待办未完成 ' + openCount + ' 件　'
             + '<a href="#" id="back-now">回到本周</a></span></div>';
-      html += '<div class="today-list">' + weekList.map((c) =>
-        '<div class="today-item">'
-        + '<span class="t">' + esc(c.name) + '</span>'
-        + '<span class="s">' + DAYS[c.day] + ' ' + c.slot + ' 节 · ' + esc(c.place || '地点待填') + '</span>'
-        + '</div>'
-      ).join('') + '</div>';
+
+      html += '<div class="week-cards">' + [...groups.entries()].map(([name, items]) => {
+        const occ = items.map(c =>
+          DAYS[c.day] + ' ' + c.slot + ' 节' + (c.place ? '<span class="room">' + esc(c.place) + '</span>' : '')
+        ).join('<span class="sep">·</span>');
+        return '<div class="week-card">'
+             + '<div class="wc-top"><span class="wc-name">' + esc(name) + '</span>'
+             + '<span class="wc-count">×' + items.length + '</span></div>'
+             + '<div class="wc-slots">' + occ + '</div>'
+             + '</div>';
+      }).join('') + '</div>';
+
       box.innerHTML = html;
       const back = document.getElementById('back-now');
       if (back) back.addEventListener('click', e => { e.preventDefault(); goWeek(currentWeek()); });
