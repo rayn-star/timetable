@@ -57,14 +57,6 @@ rayn-star · 2026 年秋
 
 课表数据来自西北农林科技大学教务系统导出文件；本项目与学校无关，仅个人使用工具。
 
-## 审美日历（art.html）
-
-同仓库里的第二页：**每天一条艺术故事**，左图右文，只显示当天那一条。
-
-https://rayn-star.github.io/timetable/art.html
-
-内容是手写的（作者本人每天给主题、正文和一张图），不是抓取。配图用公版/自制图，不使用博物馆官网图片。
-
 ## 字体
 
 全站使用[霞鹜文楷 LXGW WenKai](https://github.com/lxgw/LxgwWenKai)，通过 jsDelivr 的 webfont 分包按需加载（只下页面实际用到的字），并保留宋体/黑体回退。
