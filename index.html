@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
@@ -495,9 +495,15 @@
     .mcell.drop-target { outline: 2px dashed var(--deep); outline-offset: 2px; }
     .mcell.empty::after { content: "+"; color: #c9c9c2; font-size: 15px; margin: 0 auto; }
 
+    /* 拖拽中把整页钉住：position:fixed 是移动端唯一可靠的锁法
+       （只写 overflow:hidden，iOS 上照样能滚） */
     body.dragging {
-      touch-action: none;
+      position: fixed;
+      left: 0;
+      right: 0;
+      width: 100%;
       overflow: hidden;
+      touch-action: none;
       -webkit-user-select: none;
       user-select: none;
     }
@@ -889,6 +895,8 @@
 
   function render() {
     board.innerHTML = '';
+    // 兜底：上一轮若被打断（来电、切后台），残留的跟手卡片在这里清掉
+    document.querySelectorAll('.drag-ghost').forEach(function (g) { g.remove(); });
 
     // 周导航
     const viewing = isViewingCurrent();
@@ -1039,6 +1047,10 @@
 
     // 拖拽期间彻底关掉"选中文字 / 长按弹菜单"
     function blockSelect(e) { e.preventDefault(); return false; }
+
+    // 锁滚动：body 改成 position:fixed 并把页面停在原滚动位置
+    let lockedY = 0, scrollLocked = false;
+    function stopScroll(e) { e.preventDefault(); }
     function enableBlock() {
       document.addEventListener('selectstart', blockSelect, true);
       document.addEventListener('contextmenu', blockSelect, true);
@@ -1047,6 +1059,12 @@
       document.documentElement.style.webkitUserSelect = 'none';
       document.body.style.webkitUserSelect = 'none';
       document.body.style.webkitTouchCallout = 'none';
+
+      lockedY = window.scrollY || window.pageYOffset || 0;
+      document.body.style.top = (-lockedY) + 'px';
+      document.body.classList.add('dragging');
+      document.addEventListener('touchmove', stopScroll, { passive: false });
+      scrollLocked = true;
     }
     function disableBlock() {
       document.removeEventListener('selectstart', blockSelect, true);
@@ -1056,12 +1074,19 @@
       document.documentElement.style.webkitUserSelect = '';
       document.body.style.webkitUserSelect = '';
       document.body.style.webkitTouchCallout = '';
+
+      document.removeEventListener('touchmove', stopScroll, { passive: false });
+      document.body.classList.remove('dragging');
+      document.body.style.top = '';
+      if (scrollLocked) {
+        window.scrollTo(0, lockedY);
+        scrollLocked = false;
+      }
     }
 
     function cleanup() {
       stopTimer();
       disableBlock();
-      document.body.classList.remove('dragging');
       cell.classList.remove('lifting');
       if (ghost) { ghost.remove(); ghost = null; }
       if (target) { target.classList.remove('drop-target'); target = null; }
@@ -1080,6 +1105,7 @@
 
       timer = setTimeout(() => {
         if (moved) return;
+        const r = cell.getBoundingClientRect();   // 先量位置，再钉住页面
         dragging = true;
         suppressClick = true;
         enableBlock();
@@ -1088,10 +1114,8 @@
           const sel = window.getSelection && window.getSelection();
           if (sel && sel.removeAllRanges) sel.removeAllRanges();
         } catch (err) { /* 忽略 */ }
-        document.body.classList.add('dragging');
         cell.classList.add('lifting');
 
-        const r = cell.getBoundingClientRect();
         const tier = cell.classList.contains('am') ? 'am' : (cell.classList.contains('pm') ? 'pm' : 'eve');
         ghost = cell.cloneNode(true);
         ghost.className = 'drag-ghost ' + tier;
