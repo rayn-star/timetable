@@ -447,7 +447,14 @@
       justify-content: center;
       gap: 2px;
       touch-action: pan-y;
+      /* 长按会被浏览器当成"选中文字/弹出复制菜单"，这三行是必须的 */
+      -webkit-user-select: none;
+      -moz-user-select: none;
+      user-select: none;
+      -webkit-touch-callout: none;
+      -webkit-tap-highlight-color: transparent;
     }
+    .mcell ::selection { background: transparent; }
     .mcell.filled { border-style: solid; border-color: transparent; }
     .mcell.am { background: var(--deep); color: #f4faf6; }
     .mcell.am .mplace { color: #cfe3d7; }
@@ -462,7 +469,12 @@
     .mcell.drop-target { outline: 2px dashed var(--deep); outline-offset: 2px; }
     .mcell.empty::after { content: "+"; color: #c9c9c2; font-size: 15px; margin: 0 auto; }
 
-    body.dragging { touch-action: none; overflow: hidden; }
+    body.dragging {
+      touch-action: none;
+      overflow: hidden;
+      -webkit-user-select: none;
+      user-select: none;
+    }
 
     /* 待办表在窄屏收一收 */
     #todo-table th.col-course, #todo-table td.col-course { display: none; }
@@ -990,8 +1002,24 @@
 
     function stopTimer() { if (timer) { clearTimeout(timer); timer = null; } }
 
+    // 拖拽期间彻底关掉"选中文字 / 长按弹菜单"
+    function blockSelect(e) { e.preventDefault(); return false; }
+    function enableBlock() {
+      document.addEventListener('selectstart', blockSelect, true);
+      document.addEventListener('contextmenu', blockSelect, true);
+      document.onselectstart = blockSelect;
+      document.body.style.webkitUserSelect = 'none';
+    }
+    function disableBlock() {
+      document.removeEventListener('selectstart', blockSelect, true);
+      document.removeEventListener('contextmenu', blockSelect, true);
+      document.onselectstart = null;
+      document.body.style.webkitUserSelect = '';
+    }
+
     function cleanup() {
       stopTimer();
+      disableBlock();
       document.body.classList.remove('dragging');
       cell.classList.remove('lifting');
       if (ghost) { ghost.remove(); ghost = null; }
@@ -999,6 +1027,9 @@
       if (dragging) setTimeout(() => { suppressClick = false; }, 0);
       dragging = false;
     }
+
+    // 安卓长按会弹上下文菜单，直接吃掉；不影响点击
+    cell.addEventListener('contextmenu', e => { e.preventDefault(); });
 
     cell.addEventListener('pointerdown', e => {
       if (e.pointerType === 'mouse') return;
@@ -1010,6 +1041,7 @@
         if (moved) return;
         dragging = true;
         suppressClick = true;
+        enableBlock();
         document.body.classList.add('dragging');
         cell.classList.add('lifting');
 
