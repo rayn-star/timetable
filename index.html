@@ -364,6 +364,225 @@
   .app a { text-decoration: underline; text-underline-offset: 2px; }
   .app a:hover { padding-block-end: 0; border-block-end: 0; }
 
+  /* ================================================================
+     移动端：单日视图 + 长按拖拽
+     桌面（>820px）用六列网格；手机上一屏放不下六列，改成"选一天、竖着看五段"。
+     ================================================================ */
+  .mobile-day { display: none; }
+
+  .drag-ghost {
+    position: fixed;
+    z-index: 9999;
+    pointer-events: none;
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-size: 13px;
+    box-shadow: 0 14px 34px rgba(0, 0, 0, .22);
+    transform: translate(-50%, -50%) scale(1.04);
+    opacity: .96;
+    /* 跟手的这张卡就在手指底下，它自己可选中就会冒出选择框/放大镜 */
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .drag-ghost * { -webkit-user-select: none; user-select: none; }
+
+  @media (max-width: 820px) {
+    .board { display: none; }
+    .mobile-day { display: block; }
+
+    /* 页面其它文字一律不可选，只留课程名/地点（下面单独放开）和输入框 */
+    .app {
+      -webkit-user-select: none;
+      user-select: none;
+    }
+    .app input,
+    .app textarea {
+      -webkit-user-select: text;
+      user-select: text;
+    }
+
+    /* 顶栏：标题独占一行，工具按钮换行排，别把标题挤成两行 */
+    .headline { flex-direction: column; align-items: flex-start; gap: 10px; }
+    .headline h1 { font-size: 22px; }
+    .tools { flex-wrap: wrap; gap: 6px; }
+    .tools button { padding: 6px 10px; font-size: 12px; border-radius: 8px; }
+
+    .weeknav { gap: 6px; font-size: 12px; }
+    .weeknav #week-label { min-width: 0; }
+    #week-meta { display: none; }
+
+    .today { padding: 12px; }
+    .today-head { flex-wrap: wrap; gap: 4px 10px; }
+    .today-head h2 { font-size: 13.5px; }
+    .today-head span { font-size: 11.5px; }
+    .today-item { padding: 6px 8px; }
+
+    .daytabs { display: flex; gap: 6px; margin-bottom: 12px; }
+    .daytab {
+      flex: 1;
+      padding: 9px 0;
+      font-size: 13px;
+      font-family: inherit;
+      color: var(--ink);
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      cursor: pointer;
+    }
+    .daytab.on { background: var(--deep); border-color: var(--deep); color: #f4faf6; }
+    .daytab.todaymark { font-weight: 700; }
+
+    .slotrow {
+      display: grid;
+      grid-template-columns: 42px 1fr;
+      gap: 10px;
+      margin-bottom: 8px;
+      align-items: stretch;
+    }
+    .slotrow .lab {
+      font-size: 11.5px;
+      color: var(--sub);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .mcell {
+      min-height: 58px;
+      width: 100%;
+      text-align: left;
+      padding: 10px 12px;
+      font-family: inherit;
+      font-size: 13px;
+      color: var(--ink);
+      background: #fdfdfc;
+      border: 1px dashed #dcdcd6;
+      border-radius: 10px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 2px;
+      touch-action: pan-y;
+      /* 长按会被浏览器当成"选中文字/弹出复制菜单"，这三行是必须的 */
+      -webkit-user-select: none;
+      -moz-user-select: none;
+      user-select: none;
+      -webkit-touch-callout: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    /* 可选中范围只开放给「课程名 + 地点」这两段文字：
+       卡片的留白、节次标签、页面其它文字一律不可选，避免长按误选一大片 */
+    .mcell .mname,
+    .mcell .mplace {
+      -webkit-user-select: text;
+      -moz-user-select: text;
+      user-select: text;
+      -webkit-touch-callout: default;
+    }
+    .mcell.filled { border-style: solid; border-color: transparent; }
+    .mcell.am { background: var(--deep); color: #f4faf6; }
+    .mcell.am .mplace { color: #cfe3d7; }
+    .mcell.pm { background: var(--mid); color: #17352a; }
+    .mcell.pm .mplace { color: #2f5c4a; }
+    .mcell.eve { background: var(--light); color: #24473a; }
+    .mcell.eve .mplace { color: #4d7161; }
+    .mcell .mname { font-weight: 600; font-size: 13.5px; line-height: 1.35; }
+    .mcell .mplace { font-size: 11.5px; }
+    .mcell .mspan { font-size: 10.5px; opacity: .9; }
+    .mcell.lifting { opacity: .35; }
+    .mcell.drop-target { outline: 2px dashed var(--deep); outline-offset: 2px; }
+    .mcell.empty::after { content: "+"; color: #c9c9c2; font-size: 15px; margin: 0 auto; }
+
+    /* 拖拽中把整页钉住：position:fixed 是移动端唯一可靠的锁法
+       （只写 overflow:hidden，iOS 上照样能滚） */
+    body.dragging {
+      position: fixed;
+      left: 0;
+      right: 0;
+      width: 100%;
+      overflow: hidden;
+      touch-action: none;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+
+    /* 待办表在窄屏收一收 */
+    #todo-table th.col-course, #todo-table td.col-course { display: none; }
+    #todo-table tbody td { padding: 7px 4px; }
+  }
+
+  /* 拖拽进行中：全页临时禁止选中（松手即撤，不影响平时复制） */
+  body.no-select,
+  body.no-select * {
+    -webkit-user-select: none !important;
+    -moz-user-select: none !important;
+    user-select: none !important;
+    -webkit-touch-callout: none !important;
+  }
+
+</style>
+<style id="auth-css">
+  /* ---- 账号系统：静态托管（github.io）没有后端时，这些元素一直 hidden ---- */
+  #authbtns[hidden], #account[hidden], #greet[hidden], #auth-name-row[hidden] { display: none !important; }
+  .tools { align-items: center; }
+  .authbtns { display: flex; gap: 6px; }
+  .account {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 3px 4px 3px 3px;
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    cursor: copy;
+  }
+  .account .avatar {
+    width: 26px; height: 26px;
+    flex: 0 0 26px;
+    border-radius: 50%;
+    display: grid; place-items: center;
+    color: #fff;
+    font-size: 12.5px;
+    font-weight: 600;
+    background: var(--deep);
+    user-select: none;
+  }
+  .account .who { display: flex; flex-direction: column; line-height: 1.15; padding-right: 2px; }
+  .account .who strong { font-size: 12.5px; font-weight: 600; white-space: nowrap; }
+  .account .who span {
+    font-size: 10.5px; color: var(--sub);
+    max-width: 132px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .account button {
+    padding: 3px 8px;
+    font-size: 11.5px;
+    font-family: inherit;
+    color: var(--sub);
+    background: transparent;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    cursor: pointer;
+  }
+  .account button:hover { color: var(--ink); border-color: var(--mid); }
+  .greet { margin: 10px 2px 0; font-size: 13px; color: var(--sub); }
+  .greet strong { color: var(--ink); font-weight: 600; }
+  #auth-dlg .authmsg { margin: 8px 0 0; min-height: 17px; font-size: 12px; line-height: 1.45; }
+  #auth-dlg .authmsg.bad { color: #b4442f; }
+  #auth-dlg .authmsg.good { color: var(--deep); }
+  #auth-dlg .linkbtn {
+    display: block; width: 100%; margin-top: 12px; padding: 0;
+    font-size: 12.5px; font-family: inherit; color: var(--deep);
+    background: none; border: 0; cursor: pointer; text-align: center;
+  }
+  #auth-dlg .linkbtn:hover { text-decoration: underline; }
+  #auth-dlg .authnote {
+    margin: 12px 0 0; padding-top: 10px;
+    border-top: 1px dashed var(--line);
+    font-size: 11px; line-height: 1.55; color: #9a9aa2;
+  }
+  #auth-dlg .authnote code { font-size: 10.5px; color: #7d7d86; }
 </style>
 </head>
 <body>
@@ -378,6 +597,15 @@
         <button id="btn-import" type="button">导入</button>
         <input id="file-import" type="file" accept=".json,application/json" hidden>
         <input id="file-xlsx" type="file" accept=".xlsx" hidden>
+        <span class="authbtns" id="authbtns" hidden>
+          <button id="btn-login" type="button">登录</button>
+          <button id="btn-register" type="button">注册</button>
+        </span>
+        <div class="account" id="account" hidden>
+          <span class="avatar" id="avatar">·</span>
+          <span class="who"><strong id="uname"></strong><span id="umail"></span></span>
+          <button id="btn-logout" type="button">退出</button>
+        </div>
       </div>
     </div>
     <div class="weeknav">
@@ -390,10 +618,12 @@
   </header>
 
   <section class="today" id="today"></section>
+  <p class="greet" id="greet" hidden></p>
 
   <div class="layout">
     <section class="board-wrap">
       <div class="board" id="board"></div>
+      <div class="mobile-day" id="mobile-day" hidden></div>
     </section>
 
     <aside class="side">
@@ -413,6 +643,27 @@
     </aside>
   </div>
 </div>
+
+<dialog id="auth-dlg">
+  <h3 id="auth-title">登录</h3>
+  <form id="auth-form" novalidate>
+    <div id="auth-name-row" hidden>
+      <label for="auth-name">昵称</label>
+      <input id="auth-name" maxlength="24" placeholder="例如：润泽" autocomplete="nickname">
+    </div>
+    <label for="auth-email">邮箱</label>
+    <input id="auth-email" type="email" placeholder="you@example.com" autocomplete="username">
+    <label for="auth-password">密码</label>
+    <input id="auth-password" type="password" placeholder="至少 8 位" autocomplete="current-password">
+    <p class="authmsg" id="auth-msg"></p>
+    <div class="actions">
+      <button type="button" id="auth-cancel">取消</button>
+      <button type="submit" class="primary" id="auth-submit">登录</button>
+    </div>
+  </form>
+  <button type="button" class="linkbtn" id="auth-switch">还没有账号？注册</button>
+  <p class="authnote">账号存在本机 <code>data/users.json</code>，密码用 scrypt 加盐哈希保存，不存明文。</p>
+</dialog>
 
 <dialog id="hw-dlg">
   <h3>记作业</h3>
@@ -608,6 +859,12 @@
 
   // 当前正在看第几周；只有"本周"允许编辑
   let viewWeek = currentWeek();
+  // 移动端单日视图里选中的星期（0=周一）
+  let selDay = (function () {
+    const t = todayIndex();
+    return t >= 0 ? t : 0;
+  })();
+  let suppressClick = false;
   function isViewingCurrent() { return viewWeek === currentWeek(); }
   function listForView() {
     return isViewingCurrent() ? state.courses : coursesOfWeek(viewWeek);
@@ -730,6 +987,8 @@
 
   function render() {
     board.innerHTML = '';
+    // 兜底：上一轮若被打断（来电、切后台），残留的跟手卡片在这里清掉
+    document.querySelectorAll('.drag-ghost').forEach(function (g) { g.remove(); });
 
     // 周导航
     const viewing = isViewingCurrent();
@@ -812,6 +1071,197 @@
 
     renderTodos();
     renderToday();
+    renderMobileDay();
+  }
+
+  // ---------------- 移动端：单日视图 ----------------
+  function renderMobileDay() {
+    const box = document.getElementById('mobile-day');
+    if (!box) return;
+    const viewing = isViewingCurrent();
+    const ti = todayIndex();
+
+    let html = '<div class="daytabs">';
+    DAYS.forEach((d, i) => {
+      const cls = 'daytab' + (i === selDay ? ' on' : '') + (i === ti && viewing ? ' todaymark' : '');
+      html += '<button type="button" class="' + cls + '" data-day="' + i + '">' + d + '</button>';
+    });
+    html += '</div>';
+
+    SLOTS.forEach(s => {
+      const c = courseAt(selDay, s.id);
+      html += '<div class="slotrow"><div class="lab">' + s.label + '</div>';
+      if (c) {
+        html += '<button type="button" class="mcell filled ' + s.tier + '" data-slot="' + s.id + '" data-id="' + esc(c.id) + '">'
+              + '<span class="mname">' + esc(c.name) + '</span>'
+              + '<span class="mplace">' + esc(c.place || '地点待填') + '</span>'
+              + (c.span ? '<span class="mspan">' + esc(c.span) + '</span>' : '')
+              + '</button>';
+      } else {
+        html += '<button type="button" class="mcell empty" data-slot="' + s.id + '"></button>';
+      }
+      html += '</div>';
+    });
+
+    html += '<p class="empty-note">' + (viewing
+      ? '点空格添加，点课卡修改；按住约半秒可拖到同一天的其他节次。'
+      : '正在看第 ' + viewWeek + ' 周（只读）。') + '</p>';
+
+    box.innerHTML = html;
+
+    box.querySelectorAll('.daytab').forEach(btn => {
+      btn.addEventListener('click', () => {
+        selDay = Number(btn.dataset.day);
+        renderMobileDay();
+      });
+    });
+
+    box.querySelectorAll('.mcell').forEach(cell => {
+      const slot = cell.dataset.slot;
+      cell.addEventListener('click', () => {
+        if (suppressClick || !viewing) return;
+        const c = courseAt(selDay, slot);
+        if (c) openDialog(c);
+        else openDialog(null, selDay, slot);
+      });
+      if (cell.dataset.id && viewing) attachTouchDrag(cell);
+    });
+  }
+
+  // 长按 500ms 进入拖拽：短按仍是"点开修改"，手指先滑走则是滚动
+  function attachTouchDrag(cell) {
+    let timer = null;
+    let startX = 0, startY = 0;
+    let moved = false, dragging = false;
+    let ghost = null, target = null;
+
+    function stopTimer() { if (timer) { clearTimeout(timer); timer = null; } }
+
+    // 拖拽期间彻底关掉"选中文字 / 长按弹菜单"
+    function blockSelect(e) { e.preventDefault(); return false; }
+
+    // 锁滚动：body 改成 position:fixed 并把页面停在原滚动位置
+    let lockedY = 0, scrollLocked = false;
+    function stopScroll(e) { e.preventDefault(); }
+    function enableBlock() {
+      document.addEventListener('selectstart', blockSelect, true);
+      document.addEventListener('contextmenu', blockSelect, true);
+      document.onselectstart = blockSelect;
+      document.body.classList.add('no-select');
+      document.documentElement.style.webkitUserSelect = 'none';
+      document.body.style.webkitUserSelect = 'none';
+      document.body.style.webkitTouchCallout = 'none';
+
+      lockedY = window.scrollY || window.pageYOffset || 0;
+      document.body.style.top = (-lockedY) + 'px';
+      document.body.classList.add('dragging');
+      document.addEventListener('touchmove', stopScroll, { passive: false });
+      scrollLocked = true;
+    }
+    function disableBlock() {
+      document.removeEventListener('selectstart', blockSelect, true);
+      document.removeEventListener('contextmenu', blockSelect, true);
+      document.onselectstart = null;
+      document.body.classList.remove('no-select');
+      document.documentElement.style.webkitUserSelect = '';
+      document.body.style.webkitUserSelect = '';
+      document.body.style.webkitTouchCallout = '';
+
+      document.removeEventListener('touchmove', stopScroll, { passive: false });
+      document.body.classList.remove('dragging');
+      document.body.style.top = '';
+      if (scrollLocked) {
+        window.scrollTo(0, lockedY);
+        scrollLocked = false;
+      }
+    }
+
+    function cleanup() {
+      stopTimer();
+      disableBlock();
+      cell.classList.remove('lifting');
+      if (ghost) { ghost.remove(); ghost = null; }
+      if (target) { target.classList.remove('drop-target'); target = null; }
+      if (dragging) setTimeout(() => { suppressClick = false; }, 0);
+      dragging = false;
+    }
+
+    // 安卓长按会弹上下文菜单，直接吃掉；不影响点击
+    cell.addEventListener('contextmenu', e => { e.preventDefault(); });
+
+    cell.addEventListener('pointerdown', e => {
+      if (e.pointerType === 'mouse') return;
+      startX = e.clientX; startY = e.clientY;
+      moved = false;
+      try { cell.setPointerCapture(e.pointerId); } catch (err) { /* 老浏览器忽略 */ }
+
+      timer = setTimeout(() => {
+        if (moved) return;
+        const r = cell.getBoundingClientRect();   // 先量位置，再钉住页面
+        dragging = true;
+        suppressClick = true;
+        enableBlock();
+        // 500ms 前后浏览器可能已经开始选词：进入拖拽就把已有的选区清掉
+        try {
+          const sel = window.getSelection && window.getSelection();
+          if (sel && sel.removeAllRanges) sel.removeAllRanges();
+        } catch (err) { /* 忽略 */ }
+        cell.classList.add('lifting');
+
+        const tier = cell.classList.contains('am') ? 'am' : (cell.classList.contains('pm') ? 'pm' : 'eve');
+        ghost = cell.cloneNode(true);
+        ghost.className = 'drag-ghost ' + tier;
+        ghost.style.width = r.width + 'px';
+        ghost.style.left = (r.left + r.width / 2) + 'px';
+        ghost.style.top = (r.top + r.height / 2) + 'px';
+        document.body.appendChild(ghost);
+      }, 500);
+    });
+
+    cell.addEventListener('pointermove', e => {
+      if (!dragging) {
+        if (Math.abs(e.clientX - startX) > 8 || Math.abs(e.clientY - startY) > 8) {
+          moved = true;
+          stopTimer();
+        }
+        return;
+      }
+      e.preventDefault();
+      if (ghost) {
+        ghost.style.left = e.clientX + 'px';
+        ghost.style.top = e.clientY + 'px';
+      }
+      const el = document.elementFromPoint(e.clientX, e.clientY);
+      const over = el ? el.closest('.mcell') : null;
+      const next = (over && over !== cell) ? over : null;
+      if (next !== target) {
+        if (target) target.classList.remove('drop-target');
+        target = next;
+        if (target) target.classList.add('drop-target');
+      }
+    });
+
+    cell.addEventListener('pointerup', () => {
+      if (!dragging) { stopTimer(); return; }
+      const dropSlot = target ? target.dataset.slot : null;
+      const id = cell.dataset.id;
+      const fromSlot = cell.dataset.slot;
+      cleanup();
+      if (!dropSlot || dropSlot === fromSlot) return;
+
+      let moved = false;
+      try {
+        moved = moveCourse(id, selDay, dropSlot) === true;
+      } catch (err) {
+        moved = false;
+      }
+      // 无论成功、取消还是出错，都按 state 重画一遍：
+      // 取消时绝不能留下"课卡已消失 / 停在半透明"的残影
+      if (!moved) render();
+    });
+
+    cell.addEventListener('pointercancel', cleanup);
+    cell.addEventListener('pointerleave', () => { if (!dragging) stopTimer(); });
   }
 
   function courseOrder() {
@@ -1334,6 +1784,209 @@
   });
 
   render();
+})();
+</script>
+<script id="auth-js">
+/* 账号前端：登录 / 注册 / 退出。
+   页面本身不依赖后端——拿不到 /api/me 就当静态版，什么都不显示。 */
+(function () {
+  'use strict';
+
+  var $ = function (id) { return document.getElementById(id); };
+  var account = $('account');
+  var authbtns = $('authbtns');
+  var greet = $('greet');
+  var dlg = $('auth-dlg');
+  var form = $('auth-form');
+  var msg = $('auth-msg');
+  var title = $('auth-title');
+  var submit = $('auth-submit');
+  var switchBtn = $('auth-switch');
+  var nameRow = $('auth-name-row');
+  var EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
+  var mode = 'login';
+  var me = null;
+  var booted = false;
+
+  function call(path, method, body) {
+    return fetch(path, {
+      method: method || 'GET',
+      credentials: 'same-origin',
+      headers: body ? { 'Content-Type': 'application/json' } : undefined,
+      body: body ? JSON.stringify(body) : undefined,
+    }).then(function (res) {
+      return res.json().catch(function () { return {}; }).then(function (data) {
+        return { status: res.status, data: data || {} };
+      });
+    });
+  }
+
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  // 邮箱决定头像颜色，同一个人每次进来都是同一个色
+  function colorOf(seed) {
+    var h = 0;
+    for (var i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) % 360;
+    return 'hsl(' + h + ', 42%, 40%)';
+  }
+
+  function countOpen() {
+    try {
+      var s = JSON.parse(localStorage.getItem('timetable.v2') || '{}');
+      if (!Array.isArray(s.todos)) return 0;
+      return s.todos.filter(function (t) { return t && !t.done; }).length;
+    } catch (e) { return 0; }
+  }
+
+  function greetingText() {
+    var d = new Date();
+    var h = d.getHours();
+    var part = h < 5 ? '夜深了' : h < 11 ? '早上好' : h < 14 ? '中午好' : h < 18 ? '下午好' : '晚上好';
+    var wd = '日一二三四五六'.charAt(d.getDay());
+    var open = countOpen();
+    return [
+      part + '，<strong>' + esc(me.name) + '</strong>',
+      (d.getMonth() + 1) + ' 月 ' + d.getDate() + ' 日 星期' + wd,
+      open > 0 ? '还有 ' + open + ' 条待办没勾' : '待办都清空了',
+    ].join(' · ');
+  }
+
+  function paint() {
+    if (me) {
+      var av = $('avatar');
+      av.textContent = (me.name || '?').trim().charAt(0).toUpperCase() || '?';
+      av.style.background = colorOf(me.email || me.name);
+      $('uname').textContent = me.name;
+      $('umail').textContent = me.email;
+      account.title = me.email + ' · 点一下复制';
+      greet.innerHTML = greetingText();
+      account.hidden = false;
+      greet.hidden = false;
+      authbtns.hidden = true;
+    } else {
+      account.hidden = true;
+      greet.hidden = true;
+      authbtns.hidden = !booted;
+    }
+  }
+
+  function show(text, cls) {
+    msg.textContent = text || '';
+    msg.className = 'authmsg' + (cls ? ' ' + cls : '');
+  }
+
+  function setBusy(busy) {
+    submit.disabled = busy;
+    submit.textContent = busy
+      ? (mode === 'register' ? '创建中…' : '登录中…')
+      : (mode === 'register' ? '创建账号' : '登录');
+  }
+
+  function open(m) {
+    mode = m;
+    var isReg = m === 'register';
+    title.textContent = isReg ? '注册' : '登录';
+    nameRow.hidden = !isReg;
+    switchBtn.textContent = isReg ? '已经有账号了？去登录' : '还没有账号？注册';
+    $('auth-password').setAttribute('autocomplete', isReg ? 'new-password' : 'current-password');
+    show('');
+    setBusy(false);
+    dlg.showModal();
+    setTimeout(function () { (isReg ? $('auth-name') : $('auth-email')).focus(); }, 40);
+  }
+
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var name = $('auth-name').value.trim().replace(/\s+/g, ' ');
+    var email = $('auth-email').value.trim();
+    var password = $('auth-password').value;
+
+    if (mode === 'register') {
+      if (!name) return show('昵称不能为空', 'bad');
+      if (name.length > 24) return show('昵称最多 24 个字', 'bad');
+    }
+    if (!email) return show('邮箱不能为空', 'bad');
+    if (!EMAIL_RE.test(email)) return show('邮箱格式不对，例如 you@example.com', 'bad');
+    if (password.length < 8) return show('密码至少 8 位', 'bad');
+
+    setBusy(true);
+    call(mode === 'register' ? '/api/register' : '/api/login', 'POST',
+      mode === 'register' ? { name: name, email: email, password: password }
+                          : { email: email, password: password }
+    ).then(function (r) {
+      if (r.status >= 200 && r.status < 300 && r.data.ok && r.data.user) {
+        me = r.data.user;
+        dlg.close();
+        paint();
+        return;
+      }
+      show(r.data.error || '失败了，再试一次', 'bad');
+      setBusy(false);
+    }).catch(function () {
+      show('连不上后端，确认 node server.js 还在跑', 'bad');
+      setBusy(false);
+    });
+  });
+
+  $('btn-login').addEventListener('click', function () { open('login'); });
+  $('btn-register').addEventListener('click', function () { open('register'); });
+  switchBtn.addEventListener('click', function () { open(mode === 'login' ? 'register' : 'login'); });
+  $('auth-cancel').addEventListener('click', function () { dlg.close(); });
+
+  // 点遮罩关闭；点对话框内部（含内边距）不关
+  dlg.addEventListener('click', function (e) {
+    if (e.target !== dlg) return;
+    var r = dlg.getBoundingClientRect();
+    if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) dlg.close();
+  });
+  dlg.addEventListener('close', function () { $('auth-password').value = ''; show(''); });
+
+  $('btn-logout').addEventListener('click', function (e) {
+    e.stopPropagation();
+    call('/api/logout', 'POST', {}).catch(function () {});
+    me = null;
+    paint();
+  });
+
+  // 点账号胶囊 = 复制邮箱
+  account.addEventListener('click', function () {
+    if (!me) return;
+    var mail = me.email;
+    var done = function () {
+      var node = $('umail');
+      var old = node.textContent;
+      node.textContent = '已复制 ✓';
+      setTimeout(function () { node.textContent = old; }, 1100);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(mail).then(done, fallbackCopy);
+    } else {
+      fallbackCopy();
+    }
+    function fallbackCopy() {
+      var ta = document.createElement('textarea');
+      ta.value = mail;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); done(); } catch (e) { /* ignore */ }
+      ta.remove();
+    }
+  });
+
+  // 启动：问后端我是谁。拿不到（静态托管 404 / 网络错）就保持原样。
+  call('/api/me').then(function (r) {
+    if (r.status !== 200 && r.status !== 401) return;
+    booted = true;
+    me = (r.status === 200 && r.data.user) ? r.data.user : null;
+    paint();
+  }).catch(function () { /* 静态版，不显示账号 UI */ });
 })();
 </script>
 </body>
