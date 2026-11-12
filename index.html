@@ -1,122 +1,61 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-state="locked">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#292b27">
-  <title>继续你的学习 · 我的课表</title>
-  <style>
-    :root{color-scheme:dark;font-family:"LXGW WenKai","KaiTi",serif;background:#292b27;color:#f2eddf}
-    *{box-sizing:border-box}[hidden]{display:none!important}body{margin:0;min-height:100svh;display:grid;place-items:center;padding:28px;background:radial-gradient(ellipse at 15% 10%,#4b4c3d,transparent 65%)}
-    main{width:min(100%,570px)}.eyebrow{font:11px Arial,sans-serif;letter-spacing:.2em;color:#cdbd9c}.rule{width:44px;border:0;border-top:1px solid #ad9e7d;margin:28px 0}h1{font-weight:400;font-size:clamp(29px,7vw,40px);line-height:1.4;margin:0 0 20px}
-    p{font-size:16px;line-height:1.8;color:#d1ccbd;margin:0 0 15px}.notice{border-left:2px solid #c7b38e;padding:8px 0 8px 18px;margin:25px 0;background:linear-gradient(90deg,#d8c8a50a,transparent)}.notice p{margin:0;font-size:14px}.notice.error{border-color:#f0b4a0}.actions{display:flex;gap:14px;flex-wrap:wrap;margin-top:30px}
-    button,.button{display:inline-flex;align-items:center;justify-content:center;min-height:48px;border:1px solid #d8c8a5;padding:11px 20px;font:16px "LXGW WenKai","KaiTi",serif;cursor:pointer;text-decoration:none;background:#d8c8a5;color:#292b27}.button.secondary{background:transparent;color:#ece4d2;border-color:#8b8977}button:hover{background:#ecdfbd}.button.secondary:hover{background:#ffffff0b}
-    button:focus-visible,a:focus-visible{outline:2px solid #eadbbb;outline-offset:5px}.fine{font-size:12px;color:#aaa99c;margin-top:27px}footer{margin-top:48px;font:10px Georgia,serif;color:#b6ac96;letter-spacing:.08em}#feedback{min-height:24px;font-size:13px;color:#d8c8a5;margin-top:15px}code{font:12px ui-monospace,monospace;overflow-wrap:anywhere}
-    @media(max-width:420px){body{padding:24px}.actions{flex-direction:column}button,.button{width:100%}}
-  </style>
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="description" content="我的课表 · 加密静态版。输入密码查看课表。">
+  <title>Little by little · 我的课表</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='8' fill='%23292b27'/%3E%3Cpath d='M10 32V18a10 10 0 0 1 20 0v14M15 32V18a5 5 0 0 1 10 0v14' fill='none' stroke='%23d8c8a5' stroke-width='1.5'/%3E%3C/svg%3E">
+  <link rel="preload" as="image" href="assets/school-of-athens.jpg">
+  <link rel="preload" as="font" type="font/ttf" href="assets/pinyon-script.ttf" crossorigin>
+  <link rel="stylesheet" href="assets/login.css?v=7049869bee">
+  <script src="assets/payload.js?v=7049869bee"></script>
+  <script src="assets/unlock.js?v=7049869bee" defer></script>
 </head>
 <body>
-  <main>
-    <p class="eyebrow">MY TIMETABLE · A NEW CHAPTER</p>
-    <hr class="rule">
-    <h1 id="heading">正在前往新版课表…</h1>
-    <p id="intro">新版已加入登录首页，让学习从这里继续。</p>
-    <section id="migration" hidden aria-label="保存旧课表">
-      <div class="notice" id="notice"><p id="summary"></p></div>
-      <p id="instructions">先下载备份，再进入新版。登录后点击课表右上角「导入」，选择刚下载的 JSON 文件即可。</p>
-      <div class="actions">
-        <button id="download" type="button">下载旧课表备份 ↓</button>
-        <a class="button secondary" href="https://rayn-timetable-athens.levelhibiscus3.chatgpt.site/">进入新版 ↗</a>
-      </div>
-      <p id="feedback" role="status" aria-live="polite"></p>
-      <p class="fine">旧数据只在这个浏览器中读取和下载，不会自动上传，也不会被删除。你可以随时回来继续备份。新版使用新的网址，无法直接读取旧网址保存的数据。</p>
-    </section>
-    <p id="fallback"><a class="button secondary" href="https://rayn-timetable-athens.levelhibiscus3.chatgpt.site/">直接进入新版 ↗</a></p>
-    <noscript><p>浏览器未启用 JavaScript，无法检查旧课表。若之前在这个浏览器保存过课程或待办，请先启用 JavaScript 并刷新本页，再下载备份。</p></noscript>
-    <footer>Little by little, a little becomes a lot.</footer>
-  </main>
-  <script>
-  'use strict';
-  // @BACKUP_HELPERS_START
-  function buildMigrationBackup(rawState,rawTerm,exportedAt=new Date().toISOString()) {
-    const hasData=rawState!==null || rawTerm!==null;
-    const errors=[];
-    function parse(raw,key) {
-      if(raw===null) return null;
-      try {
-        const value=JSON.parse(raw);
-        if(!value || typeof value!=='object' || Array.isArray(value)) {
-          errors.push(key+': 不是有效的数据对象'); return null;
-        }
-        return value;
-      } catch {errors.push(key+': JSON 解析失败');return null;}
-    }
-    const state=parse(rawState,'timetable.v2');
-    const term=parse(rawTerm,'timetable.term.v1');
-    if(state) {
-      if(!Array.isArray(state.courses)) errors.push('timetable.v2: courses 格式异常');
-      if(!Array.isArray(state.todos)) errors.push('timetable.v2: todos 格式异常');
-      if(!Number.isInteger(state.week)) errors.push('timetable.v2: week 格式异常');
-    }
-    if(term) {
-      if(!Array.isArray(term.entries)) errors.push('timetable.term.v1: entries 格式异常');
-      if(!term.meta || typeof term.meta!=='object' || Array.isArray(term.meta)) errors.push('timetable.term.v1: meta 格式异常');
-    }
-    const backup={
-      app:'timetable',version:4,exportedAt,
-      week:Number.isInteger(state?.week) ? state.week : null,
-      courses:Array.isArray(state?.courses) ? state.courses : [],
-      todos:Array.isArray(state?.todos) ? state.todos : [],
-      term:rawTerm===null ? null : {entries:Array.isArray(term?.entries) ? term.entries : [],meta:term?.meta && typeof term.meta==='object' && !Array.isArray(term.meta) ? term.meta : {}}
-    };
-    if(errors.length) {
-      // 保存两个键的完整原文，包含损坏的 JSON；不靠重序列化猜测或修复。
-      backup.rawStorage={'timetable.v2':rawState,'timetable.term.v1':rawTerm};
-      backup.recoveryErrors=errors;
-    }
-    return {hasData,recovery:errors.length>0,backup};
-  }
-  // @BACKUP_HELPERS_END
-  (()=>{
-    const destination='https://rayn-timetable-athens.levelhibiscus3.chatgpt.site/';
-    const $=id=>document.getElementById(id);
-    let result;
-    try {
-      result=buildMigrationBackup(localStorage.getItem('timetable.v2'),localStorage.getItem('timetable.term.v1'));
-    } catch {
-      $('heading').textContent='先保留你的旧数据';
-      $('intro').textContent='浏览器暂时不允许读取本地数据。如果这里有旧课表，请允许本站使用本地存储后刷新；也可以稍后再回来。';
-      return;
-    }
-    if(!result.hasData) {location.replace(destination);return;}
-    $('heading').textContent='把积累，带到新的地方。';
-    $('intro').textContent='这个浏览器里还有你的旧课表。花一点时间保存下来，就能在新版继续使用。';
-    $('migration').hidden=false;
-    $('fallback').hidden=true;
-    const backup=result.backup;
-    $('summary').textContent=`检测到 ${backup.courses.length} 条课程、${backup.todos.length} 条待办，以及 ${backup.term?.entries.length || 0} 条学期课程记录。`;
-    if(result.recovery) {
-      $('notice').classList.add('error');
-      $('summary').textContent='部分旧数据的格式异常，但完整原文仍然可以保存。请先下载恢复备份。';
-      $('instructions').textContent='恢复备份包含两个存储键的完整原文。请保留这个文件，修复后再导入；不要覆盖或清除旧浏览器数据。';
-      $('download').textContent='下载完整恢复备份 ↓';
-    }
-    $('download').addEventListener('click',()=>{
-      try {
-        // 每次点击重新读取，避免另一个旧标签页更新数据后只导出过时快照。
-        const current=buildMigrationBackup(localStorage.getItem('timetable.v2'),localStorage.getItem('timetable.term.v1'));
-        if(!current.hasData) {$('feedback').textContent='未找到可备份的数据。未删除或更改任何本地记录。';return;}
-        const blob=new Blob([JSON.stringify(current.backup,null,2)],{type:'application/json;charset=utf-8'});
-        const url=URL.createObjectURL(blob);
-        const link=document.createElement('a');
-        link.href=url;
-        link.download=`课表-${current.recovery?'恢复备份':'迁移备份'}-${new Date().toISOString().slice(0,10)}.json`;
-        document.body.appendChild(link);link.click();link.remove();
-        setTimeout(()=>URL.revokeObjectURL(url),60000);
-        $('feedback').textContent=current.recovery ? '已发起恢复备份下载。请确认文件已保存，旧数据仍保留。' : '已发起备份下载。确认文件保存后，即可进入新版导入。';
-      } catch {$('feedback').textContent='暂时无法生成备份。请保留此页，允许本地存储和文件下载后重试。';}
-    });
-  })();
-  </script>
+  <div class="scene" aria-hidden="true">
+    <div class="painting"></div><div class="shade"></div>
+    <div class="mist mist-one"></div><div class="mist mist-two"></div>
+    <div class="light"></div><div class="grain"></div>
+  </div>
+  <div class="page">
+    <header class="masthead">
+      <a class="brand" href="./" aria-label="我的课表首页">
+        <svg viewBox="0 0 40 46" fill="none" aria-hidden="true"><path d="M3 43V20a17 17 0 0 1 34 0v23M10 43V20a10 10 0 0 1 20 0v23M17 43V20a3 3 0 0 1 6 0v23" stroke="currentColor" stroke-width="1.1"/></svg>
+        <span>我的课表<small>A PLACE FOR THE CURIOUS</small></span>
+      </a>
+      <div class="edition"><span class="tiny-dot"></span> 日常有序，求知无界</div>
+    </header>
+    <main class="main">
+      <section class="intro" aria-labelledby="hero-title">
+        <p class="eyebrow">THE SCHOOL OF ATHENS <span> / </span> 1509—1511</p>
+        <h1 id="hero-title" lang="en">Little by little,<br><span>a little becomes a lot.</span></h1>
+        <p class="intro-copy">在日常里，<br>走近更广阔的世界。</p>
+        <div class="intro-line"><span></span><p>让每一次好奇，都有处安放。</p></div>
+      </section>
+      <section class="entry" aria-labelledby="entry-title">
+        <div class="entry-heading"><span class="eyebrow" id="entry-kicker">YOUR DAILY CHAPTER</span><span class="entry-number" aria-hidden="true">01 /</span></div>
+        <h2 id="entry-title">继续你的求知之旅</h2>
+        <p class="entry-copy" id="entry-copy">输入密码，翻开今天的课表。</p>
+        <form id="unlock-form" novalidate>
+          <div class="field">
+            <label for="password">密码 <span>PASSWORD</span></label>
+            <div class="password-wrap"><input id="password" name="password" type="password" autocomplete="current-password" maxlength="200" required placeholder="输入解锁密码" aria-describedby="form-message"><button type="button" class="reveal" id="reveal" aria-label="显示密码" aria-pressed="false">显示</button></div>
+          </div>
+          <p id="form-message" class="message" role="status" aria-live="polite"></p>
+          <button type="submit" id="submit" class="enter"><span id="submit-label">进入我的课表</span><span class="arrow" aria-hidden="true">↗</span></button>
+        </form>
+        <p class="entry-note"><span class="lock" aria-hidden="true">◇</span> 页面内容已加密，密码正确才会显示课表；课表数据仍保存在这个浏览器里。</p>
+        <p class="entry-note sub">忘记密码不会丢数据：可以在本机重新生成页面后继续使用同一个浏览器里的课表。</p>
+        <noscript><p class="message error">请启用 JavaScript 后输入密码。</p></noscript>
+      </section>
+    </main>
+    <footer class="footer">
+      <a class="art-credit" href="https://commons.wikimedia.org/wiki/File:Raphael_School_of_Athens.jpg" target="_blank" rel="noopener noreferrer"><span class="credit-line"></span><span>拉斐尔 · 雅典学院<small>RAPHAEL · THE SCHOOL OF ATHENS</small></span><span class="credit-arrow" aria-hidden="true">↗</span></a>
+      <button type="button" class="motion-button" id="motion" aria-pressed="false"><span class="motion-icon" aria-hidden="true">Ⅱ</span><span id="motion-label">暂停动效</span></button>
+    </footer>
+  </div>
 </body>
 </html>
