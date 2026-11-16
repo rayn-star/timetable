@@ -26,12 +26,12 @@
       <p id="instructions">先下载备份，再进入新版。登录后点击课表右上角「导入」，选择刚下载的 JSON 文件即可。</p>
       <div class="actions">
         <button id="download" type="button">下载旧课表备份 ↓</button>
-        <a class="button secondary" href="https://rayn-timetable-athens.levelhibiscus3.chatgpt.site/">进入新版 ↗</a>
+        <a class="button secondary" href="https://rayn-timetable-athens.vercel.app/">进入新版 ↗</a>
       </div>
       <p id="feedback" role="status" aria-live="polite"></p>
       <p class="fine">旧数据只在这个浏览器中读取和下载，不会自动上传，也不会被删除。你可以随时回来继续备份。新版使用新的网址，无法直接读取旧网址保存的数据。</p>
     </section>
-    <p id="fallback"><a class="button secondary" href="https://rayn-timetable-athens.levelhibiscus3.chatgpt.site/">直接进入新版 ↗</a></p>
+    <p id="fallback"><a class="button secondary" href="https://rayn-timetable-athens.vercel.app/">直接进入新版 ↗</a></p>
     <noscript><p>浏览器未启用 JavaScript，无法检查旧课表。若之前在这个浏览器保存过课程或待办，请先启用 JavaScript 并刷新本页，再下载备份。</p></noscript>
     <footer>Little by little, a little becomes a lot.</footer>
   </main>
@@ -78,7 +78,7 @@
   }
   // @BACKUP_HELPERS_END
   (()=>{
-    const destination='https://rayn-timetable-athens.levelhibiscus3.chatgpt.site/';
+    const destination='https://rayn-timetable-athens.vercel.app/';
     const $=id=>document.getElementById(id);
     let result;
     try {

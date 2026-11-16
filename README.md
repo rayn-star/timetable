@@ -3,7 +3,7 @@
 这个仓库的 GitHub Pages 现在只发布一个迁移入口，不再发布课表 HTML 或课表源码。
 
 - 旧地址：https://rayn-star.github.io/timetable/
-- 新版地址：https://rayn-timetable-athens.levelhibiscus3.chatgpt.site/
+- 新版地址：https://rayn-timetable-athens.vercel.app/
 
 ## 旧地址现在做什么
 
